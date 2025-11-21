@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Player, Offer, OfferType, Club, Position, PromisedRole, ContractType, SeasonRecord } from '../types';
+import { Player, Offer, OfferType, Club, Position, PromisedRole, ContractType, SeasonRecord, AppSettings } from '../types';
 import { generateTransferOffers } from '../services/geminiService';
 import { getClubsByTier, FREE_AGENT_CLUB, REAL_CLUBS } from '../utils/clubData';
-import { getRandomInt, calculateStars, getPromisedRole, isSurplusToRequirements, calculateMarketValue } from '../utils/gameLogic';
+import { getRandomInt, calculateStars, getPromisedRole, isSurplusToRequirements, calculateMarketValue, formatCurrency } from '../utils/gameLogic';
 import Negotiation from './Negotiation';
 import SeasonSummary from './SeasonSummary';
 
@@ -14,9 +14,10 @@ interface Props {
     onUpdatePlayer: (updatedPlayer: Player) => void;
     onSaveExit: () => void;
     isGenerating: boolean;
+    settings: AppSettings;
 }
 
-const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUpdatePlayer, onSaveExit, isGenerating }) => {
+const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUpdatePlayer, onSaveExit, isGenerating, settings }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'transfer'>('overview');
     const [managerMessage, setManagerMessage] = useState('');
     const [estimatedApps, setEstimatedApps] = useState(0);
@@ -91,38 +92,25 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
         setLoadingOffers(true);
         
         const staticOffers: Offer[] = [];
-        
-        // Logic: If out of contract, CANNOT get loans. Only transfers.
         const canLoan = !isOutOfContract && !isFreeAgent && !forcedOut;
-        
-        // Widen the criteria for "Should Generate"
         const shouldGenerateLowTier = forceLoan || forcedOut || (squadStatus === PromisedRole.YOUTH || squadStatus === PromisedRole.BACKUP) || isOutOfContract || isFreeAgent;
         
         if (shouldGenerateLowTier) {
-            // LOAN ACCESSIBILITY UPDATE:
-            // If forcing loan, look deeper down the pyramid (up to 3 tiers below) to guarantee interest
             const currentTier = player.currentClub.tier;
             let eligibleClubs: Club[] = [];
 
             if (forceLoan) {
-                 // Look for clubs from current tier down to current + 3 (min Tier 1, max Tier 5)
-                 // e.g. if in PL (Tier 1), look at Tier 2, 3, 4
-                 const minTargetTier = Math.min(currentTier, 4); // Can go sideways if low enough
+                 const minTargetTier = Math.min(currentTier, 4); 
                  const maxTargetTier = Math.min(currentTier + 3, 5);
-                 
                  eligibleClubs = REAL_CLUBS.filter(c => c.tier >= minTargetTier && c.tier <= maxTargetTier && c.name !== player.currentClub.name);
             } else if (isFreeAgent) {
-                 // Free agents look everywhere lower than top tier generally, unless star
                  eligibleClubs = REAL_CLUBS.filter(c => c.tier >= 3);
             } else {
-                 // Standard logic for backups looking for moves
                  const targetTier = Math.min(currentTier + 1, 4);
                  eligibleClubs = getClubsByTier(targetTier);
             }
 
-            // Select 5-6 clubs instead of 3 to give more choice
             const randomClubs = eligibleClubs.sort(() => 0.5 - Math.random()).slice(0, 6);
-            
             const offerType = (forcedOut || isOutOfContract || isFreeAgent) ? OfferType.TRANSFER : OfferType.LOAN;
             
             if (forceLoan && !canLoan) {
@@ -147,7 +135,6 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
         }
 
         let scoutedOffers: Offer[] = [];
-        // Simulation Offers mainly for transfers if value high
         if ((!forceLoan || isOutOfContract || isFreeAgent) && player.marketValue > 500000) {
              scoutedOffers = await generateTransferOffers(
                 player.currentAbility,
@@ -160,7 +147,6 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
             );
         }
 
-        // Remove duplicates by club name
         const combined = [...staticOffers, ...scoutedOffers];
         const uniqueOffers = combined.filter((offer, index, self) => 
             index === self.findIndex((t) => (
@@ -250,7 +236,6 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
     };
 
     const handleAcceptLoanImmediate = (offer: Offer) => {
-        // Immediate acceptance for loans
         let updatedPlayer = { ...player };
         updatedPlayer.parentClub = player.currentClub; 
         updatedPlayer.currentClub = offer.club;
@@ -302,13 +287,11 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
                  updatedPlayer.isSurplus = false;
                  updatedPlayer.marketValue = calculateMarketValue(updatedPlayer.currentAbility, updatedPlayer.age, updatedPlayer.potentialAbility, updatedPlayer.position, years);
                  
-                 // Update player in place, clear offers (as they might have been for expired contract)
                  onUpdatePlayer(updatedPlayer);
                  setOffers([]);
                  setGeneratedOffers(false);
                  setActiveTab('overview');
             } else if (negotiatingOffer.type === OfferType.EXTENSION) {
-                 // Just keep current setup, logic handles year decrement naturally next season or reset expiry
                  onStartSeason(updatedPlayer);
             }
         }
@@ -317,7 +300,6 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
 
     return (
         <div className="min-h-screen bg-slate-900 p-6 flex flex-col">
-            {/* Last Season Stats Modal */}
             {showLastSeasonStats && lastSeason && (
                  <div className="fixed inset-0 z-[60] flex items-center justify-center">
                     <div className="absolute inset-0 bg-black/80" onClick={() => setShowLastSeasonStats(false)}></div>
@@ -346,6 +328,7 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
                     onCancel={() => setNegotiatingOffer(null)}
                     onComplete={handleNegotiationComplete}
                     initialPatience={negotiationPatience}
+                    settings={settings}
                 />
             )}
 
@@ -354,7 +337,6 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
                     <div>
                         <h1 className="text-3xl font-black text-white mb-2">Pre-Season Office</h1>
                         
-                        {/* Player Identity Strip */}
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm md:text-base">
                             <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center font-bold text-slate-300 text-xs">
@@ -383,7 +365,6 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
                     </div>
 
                     <div className="flex flex-col items-end gap-2">
-                         {/* Actions */}
                         <div className="flex items-center gap-2">
                             {lastSeason && (
                                 <button 
@@ -398,7 +379,6 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
                             </button>
                         </div>
                         
-                        {/* Contract Status */}
                         <div className={`text-right px-3 py-1 rounded border ${player.contract.yearsLeft === 0 ? 'bg-red-900/20 border-red-500/50' : 'bg-slate-800 border-slate-700'}`}>
                             <div className="text-[10px] uppercase text-slate-500 font-bold">Contract Status</div>
                             <div className={`font-mono font-bold text-sm ${player.contract.yearsLeft === 0 ? 'text-red-400 animate-pulse' : 'text-green-400'}`}>
@@ -427,7 +407,6 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
                         {isFreeAgent && <span className="ml-2 text-xs bg-yellow-600 text-white px-2 py-1 rounded">Urgent</span>}
                     </button>
                     
-                    {/* Quick Action: Request Loan - Disabled if out of contract */}
                     {!isOnLoan && !isOutOfContract && !isFreeAgent && (
                         <button 
                             onClick={() => fetchOffers(true)}
@@ -466,7 +445,6 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
                                  </div>
                              )}
                              
-                             {/* Form Display in PreSeason */}
                              <div className="bg-slate-900 p-6 rounded-xl border border-slate-700">
                                  <div className="text-slate-500 text-xs uppercase font-bold">Recent Form</div>
                                  <div className={`text-2xl font-bold ${player.form > 75 ? 'text-green-400' : player.form < 40 ? 'text-red-400' : 'text-yellow-400'}`}>
@@ -495,7 +473,6 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
                                      </button>
                                  )}
 
-                                 {/* Loan Extension */}
                                  {player.parentClub && (
                                      <button 
                                         onClick={handleLoanExtension}
@@ -505,7 +482,6 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
                                      </button>
                                  )}
 
-                                 {/* Renewal Button */}
                                  {!isFreeAgent && (
                                      <button 
                                         onClick={handleRenewalStart}
@@ -550,8 +526,8 @@ const PreSeasonHub: React.FC<Props> = ({ player, lastSeason, onStartSeason, onUp
                                                 <p className="text-slate-500 text-xs mt-1">"{offer.description}"</p>
                                             </div>
                                             <div className="text-right">
-                                                <div className="text-green-400 font-mono">€{offer.wage.toLocaleString()}/wk</div>
-                                                {offer.type === OfferType.TRANSFER && <div className="text-slate-500 text-xs">Fee: €{offer.transferFee.toLocaleString()}</div>}
+                                                <div className="text-green-400 font-mono">{formatCurrency(offer.wage, settings.currency)}/wk</div>
+                                                {offer.type === OfferType.TRANSFER && <div className="text-slate-500 text-xs">Fee: {formatCurrency(offer.transferFee, settings.currency)}</div>}
                                                 {offer.type === OfferType.LOAN && <div className="text-slate-500 text-xs">Duration: 1 Year</div>}
                                                 <button 
                                                     onClick={() => {

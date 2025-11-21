@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
-import { Player, GameState, Position, SeasonRecord, ContractType, PromisedRole, LeagueRow, SeasonStats, WorldTables, StatSet, GameConfig } from './types';
+import React, { useState, useEffect } from 'react';
+import { Player, GameState, Position, SeasonRecord, ContractType, PromisedRole, LeagueRow, SeasonStats, WorldTables, StatSet, GameConfig, AppSettings, Club } from './types';
 import { generateInitialClub, generateNarrative } from './services/geminiService';
-import { calculateGrowth, getRandomInt, simulateSeasonPerformance, calculateMarketValue, handleClubProgression, generateWorldLeagues, mergeStatSet, calculateAwards, calculateForm } from './utils/gameLogic';
+import { calculateGrowth, getRandomInt, simulateSeasonPerformance, calculateMarketValue, generateWorldLeagues, mergeStatSet, calculateAwards, calculateForm, initializeWorldClubs, processWorldSeasonEnd } from './utils/gameLogic';
 import { addToHallOfFame, saveGame, loadGame, getHallOfFame, exportSaveFile } from './utils/storage';
 import StartScreen from './components/StartScreen';
 import Dashboard from './components/Dashboard';
@@ -14,6 +14,7 @@ import HallOfFame from './components/HallOfFame';
 import WorldLeagues from './components/WorldLeagues';
 import AwardCeremony from './components/AwardCeremony';
 import WelcomeScreen from './components/WelcomeScreen';
+import OptionsMenu from './components/OptionsMenu';
 
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(GameState.START_SCREEN);
@@ -28,23 +29,37 @@ const App: React.FC = () => {
   const [lastSeasonData, setLastSeasonData] = useState<{record: SeasonRecord, narrative: string, growthLog: string} | null>(null);
   const [hofPlayers, setHofPlayers] = useState<Player[]>([]);
   
+  // World State
+  const [worldClubs, setWorldClubs] = useState<Club[]>([]);
   const [currentWorldTables, setCurrentWorldTables] = useState<WorldTables>({});
   const [showWorldLeagues, setShowWorldLeagues] = useState(false);
+  
+  // UI State
+  const [showOptions, setShowOptions] = useState(false);
+  const [settings, setSettings] = useState<AppSettings>({ scale: 1.0, currency: 'EUR' });
+
   const [hasSave, setHasSave] = useState(false);
   const [seasonAwards, setSeasonAwards] = useState<string[]>([]);
-
-  // Callback to handle continuing from Welcome Screen
   const [welcomeCallback, setWelcomeCallback] = useState<() => void>(() => {});
 
+  // Apply scale transform
+  useEffect(() => {
+      document.body.style.transform = `scale(${settings.scale})`;
+      document.body.style.transformOrigin = 'top center';
+      // Adjust height to prevent scrolling issues if possible, though zoom is tricky
+      if (settings.scale < 1) document.body.style.height = `${100 / settings.scale}vh`;
+      else document.body.style.height = 'auto';
+  }, [settings.scale]);
+
   // Check for save on mount
-  React.useEffect(() => {
+  useEffect(() => {
       const save = loadGame();
       setHasSave(!!save);
   }, []);
 
   const handleSaveGame = () => {
       if (player) {
-          saveGame(player, currentYear, gameState, { midSeasonStats, midSeasonTable, lastSeasonData, currentWorldTables });
+          saveGame(player, currentYear, gameState, { midSeasonStats, midSeasonTable, lastSeasonData, currentWorldTables, worldClubs });
           alert("Game Saved Successfully! (Stored in Browser)");
           setHasSave(true);
       }
@@ -52,7 +67,7 @@ const App: React.FC = () => {
 
   const handleExportSave = () => {
       if (player) {
-          exportSaveFile(player, currentYear, gameState, { midSeasonStats, midSeasonTable, lastSeasonData, currentWorldTables });
+          exportSaveFile(player, currentYear, gameState, { midSeasonStats, midSeasonTable, lastSeasonData, currentWorldTables, worldClubs });
       }
   };
 
@@ -72,10 +87,14 @@ const App: React.FC = () => {
                       setMidSeasonStats(json.midSeasonData.midSeasonStats);
                       setMidSeasonTable(json.midSeasonData.midSeasonTable);
                       setLastSeasonData(json.midSeasonData.lastSeasonData);
-                      if (json.midSeasonData.currentWorldTables) {
-                          setCurrentWorldTables(json.midSeasonData.currentWorldTables);
+                      if (json.midSeasonData.worldClubs) {
+                          setWorldClubs(json.midSeasonData.worldClubs);
+                          setCurrentWorldTables(json.midSeasonData.currentWorldTables || generateWorldLeagues(0, json.midSeasonData.worldClubs));
                       } else {
-                          setCurrentWorldTables(generateWorldLeagues(0));
+                          // Legacy save support
+                          const newWorld = initializeWorldClubs();
+                          setWorldClubs(newWorld);
+                          setCurrentWorldTables(generateWorldLeagues(0, newWorld));
                       }
                   }
                   alert("Save file loaded successfully!");
@@ -107,10 +126,14 @@ const App: React.FC = () => {
               setMidSeasonStats(saveData.midSeasonData.midSeasonStats);
               setMidSeasonTable(saveData.midSeasonData.midSeasonTable);
               setLastSeasonData(saveData.midSeasonData.lastSeasonData);
-              if (saveData.midSeasonData.currentWorldTables) {
+              
+              if (saveData.midSeasonData.worldClubs) {
+                  setWorldClubs(saveData.midSeasonData.worldClubs);
                   setCurrentWorldTables(saveData.midSeasonData.currentWorldTables);
               } else {
-                  setCurrentWorldTables(generateWorldLeagues(0));
+                  const newWorld = initializeWorldClubs();
+                  setWorldClubs(newWorld);
+                  setCurrentWorldTables(generateWorldLeagues(0, newWorld));
               }
           }
       } else {
@@ -120,8 +143,12 @@ const App: React.FC = () => {
 
   const handleStartGame = async (name: string, inputAge: number, nationality: string, position: Position, config: GameConfig) => {
     setIsLoading(true);
-    setLoadingMessage({ title: "Scouting World", subtitles: ["Finding clubs...", "Generating youth intake...", "Negotiating contract...", "Initializing leagues..."] });
+    setLoadingMessage({ title: "Initializing World", subtitles: ["Scouting clubs...", "Populating leagues...", "Negotiating contract...", "Setting up database..."] });
     
+    // Initialize World
+    const initialWorldClubs = initializeWorldClubs();
+    setWorldClubs(initialWorldClubs);
+
     let startAge = inputAge;
     
     // Club Selection Logic
@@ -130,9 +157,11 @@ const App: React.FC = () => {
         club = await generateInitialClub(nationality, position, nationality); 
     }
     
+    // Ensure starting club is from the synchronized world list if possible
+    const syncedClub = initialWorldClubs.find(c => c.name === club!.name) || club;
+
     // Ability Logic
     let baseAbility = config.startingAbility || getRandomInt(35, 55);
-    // Random Ability if not set or if "Random" behavior implied (-1 case, or undefined/null passed)
     if ((config.startingAbility === undefined || config.startingAbility === -1) && Math.random() > 0.95) baseAbility += getRandomInt(5, 15); 
 
     let potential = config.potentialAbility || Math.min(99, Math.max(baseAbility + 20, baseAbility + getRandomInt(15, 40)));
@@ -140,7 +169,6 @@ const App: React.FC = () => {
     const naturalFitness = getRandomInt(50, 99); 
     const injuryProne = config.injuryProneness || getRandomInt(1, 15); 
 
-    // First Contract
     const initContractYears = 3;
     const initWage = 100; 
     const initValue = calculateMarketValue(baseAbility, startAge, potential, position, initContractYears);
@@ -151,9 +179,9 @@ const App: React.FC = () => {
       naturalFitness,
       injuryProne,
       fatigue: 0,
-      form: 50, // Initial neutral form
+      form: 50, 
       isSurplus: false,
-      currentClub: club,
+      currentClub: syncedClub,
       parentClub: null,
       contract: { 
           wage: initWage, 
@@ -169,9 +197,8 @@ const App: React.FC = () => {
     };
 
     setPlayer(newPlayer);
-    setCurrentWorldTables(generateWorldLeagues(0));
+    setCurrentWorldTables(generateWorldLeagues(0, initialWorldClubs));
     
-    // Show Welcome Screen for first club
     setWelcomeCallback(() => () => setGameState(GameState.PRE_SEASON));
     setGameState(GameState.WELCOME_SCREEN);
     setIsLoading(false);
@@ -186,10 +213,10 @@ const App: React.FC = () => {
     });
 
     setTimeout(() => {
-        // Simulate first half
-        const performance = simulateSeasonPerformance(player, currentYear, 0.5);
-        const worldTables = generateWorldLeagues(19); // 19 games for mid-season
+        const performance = simulateSeasonPerformance(player, currentYear, worldClubs, 0.5);
+        const worldTables = generateWorldLeagues(19, worldClubs);
 
+        // Update stats for player's league in world tables
         if (performance.leagueTable && performance.leagueTable.length > 0 && worldTables[player.currentClub.league]) {
             worldTables[player.currentClub.league] = performance.leagueTable;
         }
@@ -206,7 +233,6 @@ const App: React.FC = () => {
   const handleMidSeasonContinue = async (updatedPlayer: Player | null) => {
       if (!player) return;
       
-      // Wrapper to handle welcome screen if club changed mid-season
       if (updatedPlayer && updatedPlayer.currentClub.name !== player.currentClub.name) {
           setPlayer(updatedPlayer);
           setWelcomeCallback(() => () => executeSeasonEndSimulation(updatedPlayer));
@@ -223,12 +249,12 @@ const App: React.FC = () => {
     setIsLoading(true);
     setLoadingMessage({ 
         title: "Simulating Spring Season", 
-        subtitles: ["Title Charge...", "Relegation Battle...", "European Nights...", "End of Season Awards...", "International Tournaments..."] 
+        subtitles: ["Title Charge...", "Relegation Battle...", "European Nights...", "End of Season Awards...", "Processing Promotion & Relegation..."] 
     });
 
-    const performance = simulateSeasonPerformance(activePlayer, currentYear, 0.5, midSeasonStats, true);
+    const performance = simulateSeasonPerformance(activePlayer, currentYear, worldClubs, 0.5, midSeasonStats, true);
     
-    const worldTables = generateWorldLeagues(38); 
+    const worldTables = generateWorldLeagues(38, worldClubs); 
     if (performance.leagueTable && performance.leagueTable.length > 0 && worldTables[activePlayer.currentClub.league]) {
         worldTables[activePlayer.currentClub.league] = performance.leagueTable;
     }
@@ -255,7 +281,6 @@ const App: React.FC = () => {
         });
     }
 
-    // Correctly merge split stats
     const mergedYouth = mergeStatSet(midSeasonStats.youth, performance.stats.youth);
 
     const finalStats: SeasonStats = {
@@ -273,10 +298,9 @@ const App: React.FC = () => {
         cupStatus: performance.stats.cupStatus,
         europeStatus: performance.stats.europeStatus,
         level: performance.stats.level,
-        awards: [] // Calculate below
+        awards: [] 
     };
 
-    // Calculate Awards (Uses finalStats.total, which is SENIOR only)
     const awards = calculateAwards(activePlayer, finalStats, performance.trophies);
     finalStats.awards = awards;
     setSeasonAwards(awards);
@@ -284,8 +308,6 @@ const App: React.FC = () => {
     const finalTrophies = performance.trophies;
     const finalEvents = performance.events;
 
-    // Combined Stats for Fatigue/Growth Calculation (Includes Youth, Senior, International)
-    // This ensures even youth players playing 0 senior games get fatigue accumulation.
     const totalSenior = mergeStatSet(midSeasonStats.total, performance.stats.total);
     const totalYouth = mergeStatSet(midSeasonStats.youth, performance.stats.youth);
     const totalIntl = mergeStatSet(midSeasonStats.international, performance.stats.international);
@@ -293,7 +315,6 @@ const App: React.FC = () => {
 
     const { newCA, newFatigue, growthLog } = calculateGrowth(activePlayer, allMatchesStats, finalStats.level, finalEvents, finalStats.injuries);
     
-    // CALCULATE FORM
     const newForm = calculateForm(finalStats.total, activePlayer.position);
     
     const newAge = activePlayer.age + 1;
@@ -303,9 +324,6 @@ const App: React.FC = () => {
     if (activePlayer.contract.yearlyWageRise > 0) {
         newWage = Math.round(newWage * (1 + activePlayer.contract.yearlyWageRise / 100));
     }
-
-    let nextClub = activePlayer.currentClub;
-    let nextParent = activePlayer.parentClub;
 
     const newVal = calculateMarketValue(newCA, newAge, activePlayer.potentialAbility, activePlayer.position, newContractYears);
     
@@ -323,25 +341,31 @@ const App: React.FC = () => {
         worldState: worldTables
     };
 
+    // Process World Updates (Prom/Rel)
+    const nextWorldClubs = processWorldSeasonEnd(worldClubs, worldTables);
+    setWorldClubs(nextWorldClubs);
+
     setPlayer(prev => {
         if (!prev) return null;
-
+        
+        let nextClub = activePlayer.currentClub;
+        let nextParent = activePlayer.parentClub;
+        
         if (nextParent) {
              nextClub = nextParent;
              nextParent = null;
         }
 
-        if (!activePlayer.parentClub && nextClub.name === activePlayer.currentClub.name) {
-             nextClub = handleClubProgression(nextClub, leaguePos);
-        }
-
+        // Find updated club data from new world state
+        const updatedNextClub = nextWorldClubs.find(c => c.name === nextClub.name) || nextClub;
+        
         return {
             ...activePlayer,
             age: newAge,
             currentAbility: newCA,
             fatigue: newFatigue,
             form: newForm,
-            currentClub: nextClub,
+            currentClub: updatedNextClub,
             parentClub: nextParent,
             contract: { 
                 ...activePlayer.contract, 
@@ -377,7 +401,6 @@ const App: React.FC = () => {
           marketValue: calculateMarketValue(updatedPlayer.currentAbility, updatedPlayer.age, updatedPlayer.potentialAbility, updatedPlayer.position, updatedPlayer.contract.yearsLeft)
       });
 
-      // If club changed in pre-season, show welcome screen
       if (player && prevClubName !== newClubName) {
           setWelcomeCallback(() => () => setGameState(GameState.DASHBOARD));
           setGameState(GameState.WELCOME_SCREEN);
@@ -404,6 +427,8 @@ const App: React.FC = () => {
     <>
         {isLoading && <SimulationModal title={loadingMessage.title} subtitles={loadingMessage.subtitles} />}
         
+        {showOptions && <OptionsMenu settings={settings} onUpdate={setSettings} onClose={() => setShowOptions(false)} />}
+
         {showWorldLeagues && <WorldLeagues worldTables={currentWorldTables} onClose={() => setShowWorldLeagues(false)} />}
 
         {gameState === GameState.START_SCREEN && 
@@ -413,7 +438,8 @@ const App: React.FC = () => {
                 onLoad={handleLoadGame} 
                 onImport={handleImportSave}
                 onHallOfFame={handleShowHallOfFame} 
-                hasSave={hasSave} 
+                hasSave={hasSave}
+                onOptions={() => setShowOptions(true)} 
             />
         }
 
@@ -436,6 +462,8 @@ const App: React.FC = () => {
                     handleRetire();
                 }}
                 onViewWorld={() => setShowWorldLeagues(true)}
+                onOptions={() => setShowOptions(true)}
+                settings={settings}
             />
         )}
 
@@ -448,6 +476,7 @@ const App: React.FC = () => {
                 currentYear={currentYear} 
                 onSaveExit={handleSaveGame} 
                 onViewWorld={() => setShowWorldLeagues(true)} 
+                settings={settings}
             />
         )}
 
@@ -471,6 +500,7 @@ const App: React.FC = () => {
                 onUpdatePlayer={setPlayer}
                 isGenerating={isLoading} 
                 onSaveExit={handleSaveGame} 
+                settings={settings}
             />
         )}
 

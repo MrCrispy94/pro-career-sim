@@ -10,11 +10,12 @@ interface Props {
   onLoad: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onHallOfFame: () => void;
+  onOptions: () => void;
   isGenerating: boolean;
   hasSave: boolean;
 }
 
-const StartScreen: React.FC<Props> = ({ onStart, onLoad, onImport, onHallOfFame, isGenerating, hasSave }) => {
+const StartScreen: React.FC<Props> = ({ onStart, onLoad, onImport, onHallOfFame, onOptions, isGenerating, hasSave }) => {
   const [name, setName] = useState('');
   const [age, setAge] = useState(15);
   const [nationality, setNationality] = useState('England');
@@ -108,7 +109,15 @@ const StartScreen: React.FC<Props> = ({ onStart, onLoad, onImport, onHallOfFame,
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-green-900 p-4 py-10">
-      <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-700 my-10">
+      <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-700 my-10 relative">
+        <button 
+            onClick={onOptions}
+            className="absolute top-4 right-4 text-slate-500 hover:text-white transition p-2 rounded-full hover:bg-slate-700"
+            title="Game Options"
+        >
+            ⚙️
+        </button>
+        
         <h1 className="text-4xl font-black text-white mb-2 tracking-tight text-center">CAREER SIM <span className="text-green-500">PRO</span></h1>
         <p className="text-slate-400 mb-6 text-center">Begin your journey to football stardom.</p>
 

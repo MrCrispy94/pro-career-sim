@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { Offer, Club, OfferType, PromisedRole } from '../types';
+import { Offer, Club, OfferType, PromisedRole, AppSettings } from '../types';
+import { formatCurrency } from '../utils/gameLogic';
 
 interface Props {
     offers: Offer[];
@@ -9,16 +10,17 @@ interface Props {
     currentWage: number;
     onSelectOffer: (offer: Offer) => void;
     isGenerating: boolean;
+    settings?: AppSettings;
 }
 
-const TransferMarket: React.FC<Props> = ({ offers, currentClub, playerValue, currentWage, onSelectOffer, isGenerating }) => {
+const TransferMarket: React.FC<Props> = ({ offers, currentClub, playerValue, currentWage, onSelectOffer, isGenerating, settings }) => {
   
-  // Create a "Renewal" offer representing staying at the club
+  const currency = settings?.currency || 'EUR';
   const renewalOffer: Offer = {
       id: 'renewal-offer',
       type: OfferType.RENEWAL,
       club: currentClub,
-      wage: Math.round(currentWage * 1.1), // Slight raise for loyalty
+      wage: Math.round(currentWage * 1.1), 
       years: 3,
       transferFee: 0,
       description: "The club wants to extend your stay.",
@@ -41,7 +43,7 @@ const TransferMarket: React.FC<Props> = ({ offers, currentClub, playerValue, cur
         <div className="max-w-6xl mx-auto">
             <div className="mb-8 text-center">
                 <h1 className="text-4xl font-black text-white mb-2">Transfer Window</h1>
-                <p className="text-slate-400">Market Value: <span className="text-green-400 font-mono font-bold">€{playerValue.toLocaleString()}</span></p>
+                <p className="text-slate-400">Market Value: <span className="text-green-400 font-mono font-bold">{formatCurrency(playerValue, currency)}</span></p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
@@ -56,7 +58,7 @@ const TransferMarket: React.FC<Props> = ({ offers, currentClub, playerValue, cur
                         <div className="bg-slate-900/50 p-3 rounded-lg space-y-2">
                             <div className="flex justify-between text-sm">
                                 <span className="text-slate-500">Wage</span>
-                                <span className="text-green-400 font-mono">€{renewalOffer.wage.toLocaleString()}/wk</span>
+                                <span className="text-green-400 font-mono">{formatCurrency(renewalOffer.wage, currency)}/wk</span>
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-slate-500">Contract</span>
@@ -91,7 +93,7 @@ const TransferMarket: React.FC<Props> = ({ offers, currentClub, playerValue, cur
                             <div className="bg-slate-900/50 p-3 rounded-lg space-y-2">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-slate-500">Wage</span>
-                                    <span className="text-green-400 font-mono">€{offer.wage.toLocaleString()}/wk</span>
+                                    <span className="text-green-400 font-mono">{formatCurrency(offer.wage, currency)}/wk</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-slate-500">Contract</span>
@@ -99,7 +101,7 @@ const TransferMarket: React.FC<Props> = ({ offers, currentClub, playerValue, cur
                                 </div>
                                 <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2">
                                     <span className="text-slate-500">Transfer Fee</span>
-                                    <span className="text-yellow-500 font-mono">€{offer.transferFee.toLocaleString()}</span>
+                                    <span className="text-yellow-500 font-mono">{formatCurrency(offer.transferFee, currency)}</span>
                                 </div>
                             </div>
                             <p className="text-sm text-slate-300 italic">"{offer.description}"</p>

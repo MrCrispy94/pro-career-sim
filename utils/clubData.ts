@@ -1,21 +1,65 @@
 
-import { Club } from "../types";
+import { Club, ContinentalTier } from "../types";
+import { getRandomInt } from "./gameLogic";
 
 // Helper to create club easily
-const createClub = (name: string, league: string, country: string, tier: number, prestige: number, strength: number, primaryColor: string, secondaryColor: string): Club => ({
-    name, league, country, tier, prestige, strength, primaryColor, secondaryColor
+const createClub = (name: string, league: string, country: string, tier: number, prestige: number, strength: number, primaryColor: string, secondaryColor: string, continentalTier: ContinentalTier = ContinentalTier.NONE): Club => ({
+    id: name.replace(/\s+/g, '-').toLowerCase() + Math.random().toString(36).substr(2, 5),
+    name, league, country, tier, prestige, strength, primaryColor, secondaryColor, continentalTier
 });
+
+const CITIES_BY_COUNTRY: Record<string, string[]> = {
+    "England": ["London", "Manchester", "Liverpool", "Birmingham", "Leeds", "Sheffield", "Bristol", "Newcastle", "Sunderland", "Wolverhampton", "Southampton", "Portsmouth", "Derby", "Nottingham", "Leicester", "Coventry", "Hull", "Bradford", "Stoke", "Plymouth", "Reading", "Preston", "Luton", "Norwich", "Ipswich", "Blackpool", "Bolton", "Wigan", "Rotherham", "Cardiff", "Swansea", "Wrexham"],
+    "Spain": ["Madrid", "Barcelona", "Valencia", "Seville", "Zaragoza", "Malaga", "Murcia", "Palma", "Bilbao", "Alicante", "Cordoba", "Valladolid", "Vigo", "Gijon", "Granada", "Oviedo", "Badalona", "Cartagena", "Terrassa", "Sabadell"],
+    "Germany": ["Berlin", "Hamburg", "Munich", "Cologne", "Frankfurt", "Stuttgart", "Dusseldorf", "Dortmund", "Essen", "Leipzig", "Bremen", "Dresden", "Hanover", "Nuremberg", "Duisburg", "Bochum", "Wuppertal", "Bielefeld", "Bonn", "Munster"],
+    "Italy": ["Rome", "Milan", "Naples", "Turin", "Palermo", "Genoa", "Bologna", "Florence", "Bari", "Catania", "Venice", "Verona", "Messina", "Padua", "Trieste", "Taranto", "Brescia", "Prato", "Parma", "Modena"],
+    "France": ["Paris", "Marseille", "Lyon", "Toulouse", "Nice", "Nantes", "Strasbourg", "Montpellier", "Bordeaux", "Lille", "Rennes", "Reims", "Saint-Etienne", "Toulon", "Grenoble", "Dijon", "Angers", "Nimes", "Villeurbanne", "Le Mans"]
+};
+
+const SUFFIXES = ["United", "City", "FC", "Athletic", "Rovers", "Wanderers", "Town", "Sporting", "Real", "Inter", "Dynamo", "Union"];
+
+export const generateFillerClub = (league: string, country: string, tier: number): Club => {
+    const cities = CITIES_BY_COUNTRY[country] || CITIES_BY_COUNTRY["England"];
+    const city = cities[getRandomInt(0, cities.length - 1)];
+    const suffix = SUFFIXES[getRandomInt(0, SUFFIXES.length - 1)];
+    const name = `${city} ${suffix}`;
+    
+    // Generic colors
+    const colors = ["#DA291C", "#003399", "#000000", "#FFFFFF", "#F7C403", "#00804E"];
+    const primary = colors[getRandomInt(0, colors.length - 1)];
+    let secondary = colors[getRandomInt(0, colors.length - 1)];
+    while (secondary === primary) secondary = colors[getRandomInt(0, colors.length - 1)];
+
+    // Base Strength based on Tier
+    let strength = 20;
+    if (tier === 1) strength = 75;
+    else if (tier === 2) strength = 65;
+    else if (tier === 3) strength = 55;
+    else if (tier === 4) strength = 45;
+    else strength = 35;
+
+    return createClub(
+        name, 
+        league, 
+        country, 
+        tier, 
+        strength - 5, 
+        strength + getRandomInt(-5, 5), 
+        primary, 
+        secondary
+    );
+};
 
 export const REAL_CLUBS: Club[] = [
     // --- ENGLAND (Premier League) ---
-    createClub("Man City", "Premier League", "England", 1, 98, 98, "#6CABDD", "#1C2C5B"),
-    createClub("Liverpool", "Premier League", "England", 1, 95, 94, "#C8102E", "#00B2A9"),
-    createClub("Arsenal", "Premier League", "England", 1, 92, 92, "#EF0107", "#063672"),
-    createClub("Man Utd", "Premier League", "England", 1, 90, 86, "#DA291C", "#FBE122"),
+    createClub("Man City", "Premier League", "England", 1, 98, 98, "#6CABDD", "#1C2C5B", ContinentalTier.CHAMPIONS),
+    createClub("Liverpool", "Premier League", "England", 1, 95, 94, "#C8102E", "#00B2A9", ContinentalTier.CHAMPIONS),
+    createClub("Arsenal", "Premier League", "England", 1, 92, 92, "#EF0107", "#063672", ContinentalTier.CHAMPIONS),
+    createClub("Man Utd", "Premier League", "England", 1, 90, 86, "#DA291C", "#FBE122", ContinentalTier.EUROPA),
     createClub("Chelsea", "Premier League", "England", 1, 88, 85, "#034694", "#DBA111"),
-    createClub("Tottenham", "Premier League", "England", 1, 85, 84, "#FFFFFF", "#132257"),
+    createClub("Tottenham", "Premier League", "England", 1, 85, 84, "#FFFFFF", "#132257", ContinentalTier.EUROPA),
     createClub("Newcastle", "Premier League", "England", 1, 80, 82, "#241F20", "#FFFFFF"),
-    createClub("Aston Villa", "Premier League", "England", 1, 78, 81, "#670E36", "#95BFE5"),
+    createClub("Aston Villa", "Premier League", "England", 1, 78, 81, "#670E36", "#95BFE5", ContinentalTier.CONFERENCE),
     createClub("West Ham", "Premier League", "England", 1, 75, 78, "#7A263A", "#1BB1E7"),
     createClub("Brighton", "Premier League", "England", 1, 74, 77, "#0057B8", "#FFFFFF"),
     createClub("Everton", "Premier League", "England", 1, 72, 75, "#003399", "#FFFFFF"),
@@ -51,408 +95,47 @@ export const REAL_CLUBS: Club[] = [
     createClub("Birmingham", "Championship", "England", 2, 50, 61, "#0000DD", "#FFFFFF"),
     createClub("Huddersfield", "Championship", "England", 2, 48, 60, "#0E63AD", "#FFFFFF"),
 
-    // --- ENGLAND (League One) ---
-    createClub("Portsmouth", "League One", "England", 3, 45, 58, "#001489", "#FFFFFF"),
-    createClub("Derby County", "League One", "England", 3, 50, 60, "#FFFFFF", "#000000"),
-    createClub("Bolton", "League One", "England", 3, 45, 57, "#FFFFFF", "#263c7e"),
-    createClub("Peterborough", "League One", "England", 3, 40, 56, "#004890", "#FFFFFF"),
-    createClub("Barnsley", "League One", "England", 3, 42, 55, "#D71920", "#FFFFFF"),
-    createClub("Oxford Utd", "League One", "England", 3, 40, 54, "#F1C40F", "#002147"),
-    createClub("Blackpool", "League One", "England", 3, 42, 55, "#F68712", "#FFFFFF"),
-    createClub("Lincoln City", "League One", "England", 3, 38, 52, "#D71920", "#FFFFFF"),
-    createClub("Stevenage", "League One", "England", 3, 35, 50, "#D71920", "#FFFFFF"),
-    createClub("Leyton Orient", "League One", "England", 3, 35, 48, "#D71920", "#FFFFFF"),
-    createClub("Wigan", "League One", "England", 3, 45, 53, "#004C97", "#FFFFFF"),
-    createClub("Wycombe", "League One", "England", 3, 38, 51, "#8FBCE6", "#001F4F"),
-    createClub("Bristol Rovers", "League One", "England", 3, 38, 50, "#003399", "#FFFFFF"),
-    createClub("Northampton", "League One", "England", 3, 35, 48, "#6B1C37", "#FFFFFF"),
-    createClub("Exeter City", "League One", "England", 3, 35, 47, "#E61D2B", "#FFFFFF"),
-    createClub("Charlton", "League One", "England", 3, 40, 52, "#D10A10", "#FFFFFF"),
-    createClub("Reading", "League One", "England", 3, 45, 50, "#004494", "#FFFFFF"),
-    createClub("Shrewsbury", "League One", "England", 3, 35, 46, "#F5A12D", "#0000CC"),
-    createClub("Cambridge Utd", "League One", "England", 3, 32, 45, "#FDB913", "#000000"),
-    createClub("Burton Albion", "League One", "England", 3, 35, 46, "#FFE600", "#000000"),
-    
-    // --- ENGLAND (League Two) ---
-    createClub("Stockport", "League Two", "England", 4, 35, 55, "#005CA9", "#FFFFFF"),
-    createClub("Wrexham", "League Two", "England", 4, 40, 54, "#DA291C", "#FFFFFF"),
-    createClub("Mansfield", "League Two", "England", 4, 32, 52, "#F7C403", "#004E9E"),
-    createClub("MK Dons", "League Two", "England", 4, 35, 51, "#FFFFFF", "#000000"),
-    createClub("Barrow", "League Two", "England", 4, 30, 48, "#003399", "#FFFFFF"),
-    createClub("Crewe", "League Two", "England", 4, 35, 47, "#D71920", "#FFFFFF"),
-    createClub("Crawley", "League Two", "England", 4, 30, 47, "#D71920", "#FFFFFF"),
-    createClub("Wimbledon", "League Two", "England", 4, 35, 46, "#002D62", "#F7C403"),
-    createClub("Walsall", "League Two", "England", 4, 32, 46, "#D71920", "#FFFFFF"),
-    createClub("Bradford City", "League Two", "England", 4, 40, 48, "#F7C403", "#670E36"),
-    createClub("Gillingham", "League Two", "England", 4, 35, 46, "#003399", "#FFFFFF"),
-    createClub("Harrogate", "League Two", "England", 4, 25, 44, "#F7C403", "#000000"),
-    createClub("Notts County", "League Two", "England", 4, 35, 50, "#000000", "#FFFFFF"),
-    createClub("Tranmere", "League Two", "England", 4, 32, 45, "#FFFFFF", "#003399"),
-    createClub("Accrington", "League Two", "England", 4, 30, 44, "#D71920", "#FFFFFF"),
-    createClub("Newport", "League Two", "England", 4, 28, 43, "#F7C403", "#000000"),
-    createClub("Salford City", "League Two", "England", 4, 30, 45, "#D71920", "#FFFFFF"),
-    createClub("Swindon", "League Two", "England", 4, 35, 45, "#D71920", "#FFFFFF"),
-    createClub("Doncaster", "League Two", "England", 4, 35, 46, "#D71920", "#FFFFFF"),
-    createClub("Grimsby", "League Two", "England", 4, 30, 43, "#000000", "#FFFFFF"),
-    createClub("Morecambe", "League Two", "England", 4, 28, 42, "#D71920", "#FFFFFF"),
-    createClub("Colchester", "League Two", "England", 4, 30, 42, "#003399", "#FFFFFF"),
-    createClub("Sutton Utd", "League Two", "England", 4, 25, 40, "#F7C403", "#582C83"),
-    createClub("Forest Green", "League Two", "England", 4, 30, 40, "#000000", "#CCFF00"),
-
-    // --- ENGLAND (National League) ---
-    createClub("Chesterfield", "National League", "England", 5, 30, 44, "#003399", "#FFFFFF"),
-    createClub("Barnet", "National League", "England", 5, 25, 42, "#F58113", "#000000"),
-    createClub("Bromley", "National League", "England", 5, 25, 41, "#FFFFFF", "#000000"),
-    createClub("Altrincham", "National League", "England", 5, 20, 40, "#DA291C", "#FFFFFF"),
-    createClub("Solihull Moors", "National League", "England", 5, 25, 41, "#FEF200", "#002D62"),
-    createClub("Gateshead", "National League", "England", 5, 20, 40, "#FFFFFF", "#000000"),
-    createClub("Aldershot", "National League", "England", 5, 22, 39, "#DA291C", "#003399"),
-    createClub("Halifax Town", "National League", "England", 5, 22, 39, "#005CA9", "#FFFFFF"),
-    createClub("Oldham Athletic", "National League", "England", 5, 30, 42, "#003399", "#FFFFFF"),
-    createClub("Rochdale", "National League", "England", 5, 28, 41, "#003399", "#000000"),
-    createClub("Southend United", "National League", "England", 5, 30, 40, "#003399", "#FFFFFF"),
-    createClub("York City", "National League", "England", 5, 25, 39, "#DA291C", "#003399"),
-    createClub("Hartlepool", "National League", "England", 5, 25, 38, "#003399", "#FFFFFF"),
-    createClub("Wealdstone", "National League", "England", 5, 15, 35, "#003399", "#FEF200"),
-    createClub("Dorking", "National League", "England", 5, 15, 34, "#DA291C", "#FFFFFF"),
-    createClub("Maidenhead", "National League", "England", 5, 15, 34, "#000000", "#FFFFFF"),
-    createClub("Eastleigh", "National League", "England", 5, 20, 38, "#003399", "#FFFFFF"),
-    createClub("Woking", "National League", "England", 5, 20, 38, "#DA291C", "#FFFFFF"),
-
     // --- SPAIN (La Liga) ---
-    createClub("Real Madrid", "La Liga", "Spain", 1, 99, 97, "#FFFFFF", "#00529F"),
-    createClub("Barcelona", "La Liga", "Spain", 1, 96, 93, "#A50044", "#004D98"),
-    createClub("Atlético Madrid", "La Liga", "Spain", 1, 88, 86, "#CB3524", "#FFFFFF"),
-    createClub("Girona", "La Liga", "Spain", 1, 70, 82, "#EF3340", "#FFFFFF"),
-    createClub("Athletic Club", "La Liga", "Spain", 1, 78, 80, "#EE2523", "#000000"),
-    createClub("Real Sociedad", "La Liga", "Spain", 1, 78, 79, "#0067B1", "#FFFFFF"),
-    createClub("Real Betis", "La Liga", "Spain", 1, 76, 78, "#0BB363", "#FFFFFF"),
+    createClub("Real Madrid", "La Liga", "Spain", 1, 99, 97, "#FFFFFF", "#00529F", ContinentalTier.CHAMPIONS),
+    createClub("Barcelona", "La Liga", "Spain", 1, 96, 93, "#A50044", "#004D98", ContinentalTier.CHAMPIONS),
+    createClub("Atlético Madrid", "La Liga", "Spain", 1, 88, 86, "#CB3524", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Girona", "La Liga", "Spain", 1, 70, 82, "#EF3340", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Athletic Club", "La Liga", "Spain", 1, 78, 80, "#EE2523", "#000000", ContinentalTier.EUROPA),
+    createClub("Real Sociedad", "La Liga", "Spain", 1, 78, 79, "#0067B1", "#FFFFFF", ContinentalTier.EUROPA),
+    createClub("Real Betis", "La Liga", "Spain", 1, 76, 78, "#0BB363", "#FFFFFF", ContinentalTier.CONFERENCE),
     createClub("Valencia", "La Liga", "Spain", 1, 75, 74, "#FFFFFF", "#000000"),
     createClub("Villarreal", "La Liga", "Spain", 1, 74, 76, "#FCEE21", "#00519E"),
     createClub("Sevilla", "La Liga", "Spain", 1, 80, 75, "#FFFFFF", "#D4001F"),
-    createClub("Osasuna", "La Liga", "Spain", 1, 65, 73, "#DA291C", "#002D56"),
-    createClub("Getafe", "La Liga", "Spain", 1, 60, 72, "#005999", "#FFFFFF"),
-    createClub("Celta Vigo", "La Liga", "Spain", 1, 65, 72, "#8CC7E9", "#FFFFFF"),
-    createClub("Mallorca", "La Liga", "Spain", 1, 60, 70, "#E20613", "#000000"),
-    createClub("Rayo Vallecano", "La Liga", "Spain", 1, 58, 69, "#FFFFFF", "#D62422"),
-    createClub("Las Palmas", "La Liga", "Spain", 1, 55, 68, "#FFD100", "#005DAA"),
-    createClub("Alaves", "La Liga", "Spain", 1, 55, 67, "#0057A5", "#FFFFFF"),
-    createClub("Cadiz", "La Liga", "Spain", 1, 55, 66, "#FCE300", "#003C7D"),
-    createClub("Granada", "La Liga", "Spain", 1, 58, 65, "#A61B2B", "#FFFFFF"),
-    createClub("Almeria", "La Liga", "Spain", 1, 55, 64, "#DA291C", "#FFFFFF"),
-
-    // --- SPAIN (Segunda) ---
-    createClub("Leganes", "La Liga 2", "Spain", 2, 50, 65, "#005DAA", "#FFFFFF"),
-    createClub("Valladolid", "La Liga 2", "Spain", 2, 55, 66, "#5E278E", "#FFFFFF"),
-    createClub("Eibar", "La Liga 2", "Spain", 2, 52, 64, "#005596", "#990033"),
-    createClub("Espanyol", "La Liga 2", "Spain", 2, 60, 68, "#338EC9", "#FFFFFF"),
-    createClub("Gijon", "La Liga 2", "Spain", 2, 50, 62, "#D62422", "#FFFFFF"),
-    createClub("Oviedo", "La Liga 2", "Spain", 2, 50, 61, "#00377B", "#FFFFFF"),
-    createClub("Racing", "La Liga 2", "Spain", 2, 48, 60, "#00804E", "#FFFFFF"),
-    createClub("Elche", "La Liga 2", "Spain", 2, 50, 63, "#FFFFFF", "#00A650"),
-    createClub("Levante", "La Liga 2", "Spain", 2, 52, 62, "#003878", "#AE2339"),
-    createClub("Burgos", "La Liga 2", "Spain", 2, 45, 58, "#FFFFFF", "#000000"),
-
-    // --- SPAIN (Primera Federación - Tier 3) ---
-    createClub("Malaga", "Primera Fed", "Spain", 3, 55, 58, "#6CABDD", "#FFFFFF"),
-    createClub("Deportivo", "Primera Fed", "Spain", 3, 55, 59, "#005CA9", "#FFFFFF"),
-    createClub("Castellon", "Primera Fed", "Spain", 3, 45, 55, "#000000", "#FFFFFF"),
-    createClub("Ibiza", "Primera Fed", "Spain", 3, 40, 54, "#6CABDD", "#FFFFFF"),
-    createClub("Cordoba", "Primera Fed", "Spain", 3, 45, 54, "#00804E", "#FFFFFF"),
-    createClub("Ponferradina", "Primera Fed", "Spain", 3, 40, 53, "#003399", "#FFFFFF"),
-    createClub("Murcia", "Primera Fed", "Spain", 3, 45, 52, "#DA291C", "#FFFFFF"),
-    createClub("Recreativo", "Primera Fed", "Spain", 3, 40, 50, "#005CA9", "#FFFFFF"),
-
+    
     // --- GERMANY (Bundesliga) ---
-    createClub("Leverkusen", "Bundesliga", "Germany", 1, 85, 90, "#E32219", "#000000"),
-    createClub("Bayern Munich", "Bundesliga", "Germany", 1, 97, 96, "#DC052D", "#FFFFFF"),
-    createClub("Stuttgart", "Bundesliga", "Germany", 1, 72, 84, "#FFFFFF", "#E32219"),
-    createClub("RB Leipzig", "Bundesliga", "Germany", 1, 82, 84, "#DD013F", "#FFFFFF"),
-    createClub("Dortmund", "Bundesliga", "Germany", 1, 88, 87, "#FDE100", "#000000"),
-    createClub("Frankfurt", "Bundesliga", "Germany", 1, 75, 78, "#E1000F", "#000000"),
-    createClub("Hoffenheim", "Bundesliga", "Germany", 1, 68, 75, "#1C63B7", "#FFFFFF"),
-    createClub("Freiburg", "Bundesliga", "Germany", 1, 70, 76, "#D11A1A", "#FFFFFF"),
-    createClub("Werder Bremen", "Bundesliga", "Germany", 1, 65, 72, "#1D9053", "#FFFFFF"),
-    createClub("Wolfsburg", "Bundesliga", "Germany", 1, 70, 75, "#65B32E", "#FFFFFF"),
-    createClub("Augsburg", "Bundesliga", "Germany", 1, 60, 70, "#BA3733", "#FFFFFF"),
-    createClub("Gladbach", "Bundesliga", "Germany", 1, 72, 73, "#FFFFFF", "#000000"),
-    createClub("Heidenheim", "Bundesliga", "Germany", 1, 55, 68, "#E2001A", "#004A99"),
-    createClub("Union Berlin", "Bundesliga", "Germany", 1, 70, 74, "#D4011D", "#F6E824"),
-    createClub("Bochum", "Bundesliga", "Germany", 1, 55, 65, "#005CA9", "#FFFFFF"),
-    createClub("Mainz", "Bundesliga", "Germany", 1, 60, 68, "#C3141E", "#FFFFFF"),
-    createClub("FC Koln", "Bundesliga", "Germany", 1, 65, 67, "#FFFFFF", "#ED1C24"),
-    createClub("Darmstadt", "Bundesliga", "Germany", 1, 50, 62, "#004E9E", "#FFFFFF"),
-
-    // --- GERMANY (Bundesliga 2) ---
-    createClub("St. Pauli", "Bundesliga 2", "Germany", 2, 55, 68, "#3E2B25", "#FFFFFF"),
-    createClub("Kiel", "Bundesliga 2", "Germany", 2, 50, 66, "#005CA9", "#E32219"),
-    createClub("Dusseldorf", "Bundesliga 2", "Germany", 2, 55, 67, "#DA1A21", "#FFFFFF"),
-    createClub("Hamburg", "Bundesliga 2", "Germany", 2, 65, 70, "#005CA9", "#FFFFFF"),
-    createClub("Hannover", "Bundesliga 2", "Germany", 2, 58, 65, "#C3002F", "#000000"),
-    createClub("Karlsruhe", "Bundesliga 2", "Germany", 2, 50, 63, "#004B96", "#FFFFFF"),
-    createClub("Paderborn", "Bundesliga 2", "Germany", 2, 50, 62, "#005CA9", "#000000"),
-    createClub("Hertha BSC", "Bundesliga 2", "Germany", 2, 65, 68, "#005CA9", "#FFFFFF"),
-    createClub("Schalke 04", "Bundesliga 2", "Germany", 2, 70, 69, "#004D9D", "#FFFFFF"),
-    createClub("Nurnberg", "Bundesliga 2", "Germany", 2, 55, 60, "#8D1C24", "#FFFFFF"),
-
-    // --- GERMANY (3. Liga - Tier 3) ---
-    createClub("Dynamo Dresden", "3. Liga", "Germany", 3, 50, 58, "#F7C403", "#000000"),
-    createClub("1860 Munich", "3. Liga", "Germany", 3, 55, 57, "#6CABDD", "#FFFFFF"),
-    createClub("Saarbrucken", "3. Liga", "Germany", 3, 40, 55, "#005CA9", "#000000"),
-    createClub("Essen", "3. Liga", "Germany", 3, 45, 54, "#DA291C", "#FFFFFF"),
-    createClub("Regensburg", "3. Liga", "Germany", 3, 40, 56, "#DA291C", "#FFFFFF"),
-    createClub("Ulm", "3. Liga", "Germany", 3, 35, 53, "#000000", "#FFFFFF"),
-    createClub("Preussen Munster", "3. Liga", "Germany", 3, 35, 52, "#00804E", "#000000"),
-    createClub("Sandhausen", "3. Liga", "Germany", 3, 40, 54, "#000000", "#FFFFFF"),
+    createClub("Leverkusen", "Bundesliga", "Germany", 1, 85, 90, "#E32219", "#000000", ContinentalTier.CHAMPIONS),
+    createClub("Bayern Munich", "Bundesliga", "Germany", 1, 97, 96, "#DC052D", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Stuttgart", "Bundesliga", "Germany", 1, 72, 84, "#FFFFFF", "#E32219", ContinentalTier.CHAMPIONS),
+    createClub("RB Leipzig", "Bundesliga", "Germany", 1, 82, 84, "#DD013F", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Dortmund", "Bundesliga", "Germany", 1, 88, 87, "#FDE100", "#000000", ContinentalTier.EUROPA),
 
     // --- ITALY (Serie A) ---
-    createClub("Inter Milan", "Serie A", "Italy", 1, 90, 91, "#0068A8", "#221F20"),
-    createClub("AC Milan", "Serie A", "Italy", 1, 88, 86, "#FB090B", "#000000"),
-    createClub("Juventus", "Serie A", "Italy", 1, 92, 85, "#000000", "#FFFFFF"),
-    createClub("Bologna", "Serie A", "Italy", 1, 65, 80, "#1A2F48", "#A6192E"),
-    createClub("Roma", "Serie A", "Italy", 1, 82, 81, "#8E252F", "#F0BC42"),
-    createClub("Atalanta", "Serie A", "Italy", 1, 76, 80, "#1E71B8", "#000000"),
-    createClub("Lazio", "Serie A", "Italy", 1, 78, 79, "#87D8F7", "#FFFFFF"),
-    createClub("Fiorentina", "Serie A", "Italy", 1, 74, 78, "#4F2D7F", "#FFFFFF"),
-    createClub("Napoli", "Serie A", "Italy", 1, 85, 84, "#12A0D7", "#FFFFFF"),
-    createClub("Torino", "Serie A", "Italy", 1, 65, 74, "#8A1E41", "#FFFFFF"),
-    createClub("Genoa", "Serie A", "Italy", 1, 60, 70, "#A21C26", "#002D5C"),
-    createClub("Monza", "Serie A", "Italy", 1, 58, 69, "#E30613", "#FFFFFF"),
-    createClub("Lecce", "Serie A", "Italy", 1, 55, 65, "#DC143C", "#FFFF00"),
-    createClub("Verona", "Serie A", "Italy", 1, 55, 64, "#005395", "#F9D90D"),
-    createClub("Udinese", "Serie A", "Italy", 1, 60, 67, "#000000", "#FFFFFF"),
-    createClub("Cagliari", "Serie A", "Italy", 1, 58, 65, "#002350", "#A50044"),
-    createClub("Empoli", "Serie A", "Italy", 1, 55, 63, "#00579C", "#FFFFFF"),
-    createClub("Frosinone", "Serie A", "Italy", 1, 50, 62, "#FFD500", "#0033CC"),
-    createClub("Sassuolo", "Serie A", "Italy", 1, 62, 66, "#00A752", "#000000"),
-    createClub("Salernitana", "Serie A", "Italy", 1, 50, 60, "#8A1E41", "#FFFFFF"),
-
-    // --- ITALY (Serie B) ---
-    createClub("Parma", "Serie B", "Italy", 2, 60, 70, "#FFFFFF", "#000000"),
-    createClub("Como", "Serie B", "Italy", 2, 50, 66, "#005CA9", "#FFFFFF"),
-    createClub("Venezia", "Serie B", "Italy", 2, 55, 68, "#E45D2A", "#000000"),
-    createClub("Cremonese", "Serie B", "Italy", 2, 52, 65, "#A6192E", "#8F8F8F"),
-    createClub("Catanzaro", "Serie B", "Italy", 2, 45, 60, "#E30613", "#F9D90D"),
-    createClub("Palermo", "Serie B", "Italy", 2, 55, 64, "#F7BED9", "#000000"),
-    createClub("Sampdoria", "Serie B", "Italy", 2, 65, 63, "#004990", "#FFFFFF"),
-    createClub("Brescia", "Serie B", "Italy", 2, 50, 62, "#00529F", "#FFFFFF"),
-    createClub("Sudtirol", "Serie B", "Italy", 2, 40, 58, "#FFFFFF", "#D71920"),
-    createClub("Reggiana", "Serie B", "Italy", 2, 45, 57, "#8A1E41", "#FFFFFF"),
-
-    // --- ITALY (Serie C - Tier 3) ---
-    createClub("Cesena", "Serie C", "Italy", 3, 45, 58, "#000000", "#FFFFFF"),
-    createClub("Mantova", "Serie C", "Italy", 3, 40, 56, "#DA291C", "#FFFFFF"),
-    createClub("Juve Stabia", "Serie C", "Italy", 3, 40, 55, "#FEF200", "#003399"),
-    createClub("Padova", "Serie C", "Italy", 3, 45, 57, "#DA291C", "#FFFFFF"),
-    createClub("Triestina", "Serie C", "Italy", 3, 40, 54, "#DA291C", "#FFFFFF"),
-    createClub("Vicenza", "Serie C", "Italy", 3, 45, 56, "#DA291C", "#FFFFFF"),
-    createClub("Catania", "Serie C", "Italy", 3, 50, 55, "#6CABDD", "#DA291C"),
-    createClub("Avellino", "Serie C", "Italy", 3, 40, 53, "#00804E", "#FFFFFF"),
-    createClub("Benevento", "Serie C", "Italy", 3, 45, 55, "#FEF200", "#DA291C"),
+    createClub("Inter Milan", "Serie A", "Italy", 1, 90, 91, "#0068A8", "#221F20", ContinentalTier.CHAMPIONS),
+    createClub("AC Milan", "Serie A", "Italy", 1, 88, 86, "#FB090B", "#000000", ContinentalTier.CHAMPIONS),
+    createClub("Juventus", "Serie A", "Italy", 1, 92, 85, "#000000", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Bologna", "Serie A", "Italy", 1, 65, 80, "#1A2F48", "#A6192E", ContinentalTier.CHAMPIONS),
+    createClub("Roma", "Serie A", "Italy", 1, 82, 81, "#8E252F", "#F0BC42", ContinentalTier.EUROPA),
+    createClub("Atalanta", "Serie A", "Italy", 1, 76, 80, "#1E71B8", "#000000", ContinentalTier.EUROPA),
 
     // --- FRANCE (Ligue 1) ---
-    createClub("PSG", "Ligue 1", "France", 1, 94, 92, "#004170", "#DA291C"),
-    createClub("Monaco", "Ligue 1", "France", 1, 78, 79, "#E71D2B", "#FFFFFF"),
-    createClub("Brest", "Ligue 1", "France", 1, 55, 76, "#E30613", "#FFFFFF"),
-    createClub("Lille", "Ligue 1", "France", 1, 75, 78, "#E01E37", "#222857"),
-    createClub("Nice", "Ligue 1", "France", 1, 70, 75, "#DA291C", "#000000"),
+    createClub("PSG", "Ligue 1", "France", 1, 94, 92, "#004170", "#DA291C", ContinentalTier.CHAMPIONS),
+    createClub("Monaco", "Ligue 1", "France", 1, 78, 79, "#E71D2B", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Brest", "Ligue 1", "France", 1, 55, 76, "#E30613", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Lille", "Ligue 1", "France", 1, 75, 78, "#E01E37", "#222857", ContinentalTier.EUROPA),
+    createClub("Nice", "Ligue 1", "France", 1, 70, 75, "#DA291C", "#000000", ContinentalTier.CONFERENCE),
     createClub("Lens", "Ligue 1", "France", 1, 70, 74, "#E30613", "#F7C403"),
     createClub("Marseille", "Ligue 1", "France", 1, 80, 78, "#2FAEE0", "#FFFFFF"),
     createClub("Lyon", "Ligue 1", "France", 1, 82, 76, "#14387F", "#D52B1E"),
-    createClub("Rennes", "Ligue 1", "France", 1, 72, 75, "#E30613", "#000000"),
-    createClub("Reims", "Ligue 1", "France", 1, 60, 70, "#E30613", "#FFFFFF"),
-    createClub("Toulouse", "Ligue 1", "France", 1, 60, 68, "#6A4691", "#FFFFFF"),
-    createClub("Montpellier", "Ligue 1", "France", 1, 62, 67, "#003366", "#E45E25"),
-    createClub("Strasbourg", "Ligue 1", "France", 1, 60, 66, "#009FE3", "#FFFFFF"),
-    createClub("Nantes", "Ligue 1", "France", 1, 65, 65, "#FEEE00", "#00A550"),
-    createClub("Le Havre", "Ligue 1", "France", 1, 50, 62, "#8BB8E8", "#002E5D"),
-    createClub("Metz", "Ligue 1", "France", 1, 50, 60, "#841522", "#FFFFFF"),
-    createClub("Lorient", "Ligue 1", "France", 1, 55, 61, "#F58113", "#000000"),
-    createClub("Clermont", "Ligue 1", "France", 1, 45, 58, "#DA291C", "#1E3083"),
-
-    // --- FRANCE (Ligue 2) ---
-    createClub("Auxerre", "Ligue 2", "France", 2, 55, 68, "#FFFFFF", "#005CA9"),
-    createClub("Angers", "Ligue 2", "France", 2, 50, 66, "#000000", "#FFFFFF"),
-    createClub("St-Etienne", "Ligue 2", "France", 2, 65, 67, "#008A48", "#FFFFFF"),
-    createClub("Rodez", "Ligue 2", "France", 2, 45, 60, "#E30613", "#F7C403"),
-    createClub("Paris FC", "Ligue 2", "France", 2, 50, 62, "#14387F", "#FFFFFF"),
-    createClub("Caen", "Ligue 2", "France", 2, 50, 61, "#DE2A31", "#093C71"),
-    createClub("Laval", "Ligue 2", "France", 2, 40, 58, "#F58113", "#000000"),
-    createClub("Guingamp", "Ligue 2", "France", 2, 50, 60, "#DA291C", "#000000"),
-    createClub("Bordeaux", "Ligue 2", "France", 2, 60, 65, "#001B50", "#FFFFFF"),
-    createClub("Bastia", "Ligue 2", "France", 2, 45, 57, "#003399", "#FFFFFF"),
-
-    // --- FRANCE (Championnat National - Tier 3) ---
-    createClub("Red Star", "National 1", "France", 3, 45, 58, "#00804E", "#FFFFFF"),
-    createClub("Martigues", "National 1", "France", 3, 35, 55, "#DA291C", "#FEF200"),
-    createClub("Niort", "National 1", "France", 3, 40, 56, "#005CA9", "#FFFFFF"),
-    createClub("Dijon", "National 1", "France", 3, 45, 57, "#DA291C", "#FFFFFF"),
-    createClub("Nancy", "National 1", "France", 3, 45, 56, "#DA291C", "#FFFFFF"),
-    createClub("Sochaux", "National 1", "France", 3, 50, 58, "#FEF200", "#003399"),
-    createClub("Versailles", "National 1", "France", 3, 30, 52, "#003399", "#FFFFFF"),
-    createClub("Le Mans", "National 1", "France", 3, 40, 53, "#DA291C", "#FEF200"),
-
-    // --- NETHERLANDS (Eredivisie) ---
-    createClub("PSV", "Eredivisie", "Netherlands", 2, 78, 79, "#DA291C", "#FFFFFF"),
-    createClub("Feyenoord", "Eredivisie", "Netherlands", 2, 75, 77, "#E30613", "#FFFFFF"),
-    createClub("Twente", "Eredivisie", "Netherlands", 2, 65, 72, "#DA291C", "#FFFFFF"),
-    createClub("AZ Alkmaar", "Eredivisie", "Netherlands", 2, 68, 73, "#DA291C", "#FFFFFF"),
-    createClub("Ajax", "Eredivisie", "Netherlands", 2, 80, 76, "#DA291C", "#FFFFFF"),
-    createClub("NEC", "Eredivisie", "Netherlands", 2, 50, 65, "#E30613", "#008140"),
-    createClub("Utrecht", "Eredivisie", "Netherlands", 2, 55, 66, "#DA291C", "#FFFFFF"),
-    createClub("Sparta R.", "Eredivisie", "Netherlands", 2, 45, 62, "#DA291C", "#FFFFFF"),
-    createClub("Go Ahead Eagles", "Eredivisie", "Netherlands", 2, 45, 60, "#E30613", "#F7C403"),
-    createClub("Fortuna Sittard", "Eredivisie", "Netherlands", 2, 40, 58, "#F7C403", "#008140"),
-    createClub("Heerenveen", "Eredivisie", "Netherlands", 2, 55, 60, "#004E9E", "#FFFFFF"),
-    createClub("Almere City", "Eredivisie", "Netherlands", 2, 35, 55, "#DA291C", "#000000"),
-    createClub("Zwolle", "Eredivisie", "Netherlands", 2, 40, 56, "#005CA9", "#FFFFFF"),
-    createClub("Heracles", "Eredivisie", "Netherlands", 2, 40, 55, "#000000", "#FFFFFF"),
-    createClub("Waalwijk", "Eredivisie", "Netherlands", 2, 35, 54, "#F7C403", "#005CA9"),
-    createClub("Excelsior", "Eredivisie", "Netherlands", 2, 35, 52, "#000000", "#DA291C"),
-    createClub("Volendam", "Eredivisie", "Netherlands", 2, 30, 50, "#F58113", "#000000"),
-    createClub("Vitesse", "Eredivisie", "Netherlands", 2, 50, 55, "#F7C403", "#000000"),
-
-    // --- PORTUGAL (Liga Portugal) ---
-    createClub("Sporting CP", "Liga Portugal", "Portugal", 2, 80, 82, "#00804E", "#FFFFFF"),
-    createClub("Benfica", "Liga Portugal", "Portugal", 2, 82, 81, "#E30613", "#FFFFFF"),
-    createClub("Porto", "Liga Portugal", "Portugal", 2, 82, 80, "#004E9E", "#FFFFFF"),
-    createClub("Braga", "Liga Portugal", "Portugal", 2, 70, 74, "#DA291C", "#FFFFFF"),
-    createClub("Vitoria SC", "Liga Portugal", "Portugal", 2, 60, 68, "#FFFFFF", "#000000"),
-    createClub("Moreirense", "Liga Portugal", "Portugal", 2, 50, 62, "#00804E", "#FFFFFF"),
-    createClub("Arouca", "Liga Portugal", "Portugal", 2, 45, 60, "#F7C403", "#004E9E"),
-    createClub("Famalicao", "Liga Portugal", "Portugal", 2, 45, 61, "#003399", "#FFFFFF"),
-    createClub("Casa Pia", "Liga Portugal", "Portugal", 2, 40, 58, "#000000", "#FFFFFF"),
-    createClub("Farense", "Liga Portugal", "Portugal", 2, 35, 56, "#000000", "#FFFFFF"),
-    createClub("Rio Ave", "Liga Portugal", "Portugal", 2, 45, 58, "#00804E", "#FFFFFF"),
-    createClub("Gil Vicente", "Liga Portugal", "Portugal", 2, 40, 57, "#DA291C", "#003399"),
-    createClub("Estoril", "Liga Portugal", "Portugal", 2, 40, 56, "#F7C403", "#003399"),
-    createClub("Boavista", "Liga Portugal", "Portugal", 2, 50, 58, "#000000", "#FFFFFF"),
-    createClub("Amadora", "Liga Portugal", "Portugal", 2, 35, 54, "#DA291C", "#00804E"),
-    createClub("Portimonense", "Liga Portugal", "Portugal", 2, 40, 54, "#000000", "#FFFFFF"),
-    createClub("Vizela", "Liga Portugal", "Portugal", 2, 35, 52, "#009EE0", "#FFFFFF"),
-    createClub("Chaves", "Liga Portugal", "Portugal", 2, 35, 51, "#DA291C", "#003399"),
-
-    // --- USA (MLS) ---
-    createClub("Inter Miami", "MLS", "USA", 3, 60, 68, "#F495BC", "#000000"),
-    createClub("LA Galaxy", "MLS", "USA", 3, 55, 62, "#FFFFFF", "#00245D"),
-    createClub("Columbus", "MLS", "USA", 3, 50, 64, "#FEF200", "#000000"),
-    createClub("LAFC", "MLS", "USA", 3, 55, 65, "#000000", "#C39E6D"),
-    createClub("Cincinnati", "MLS", "USA", 3, 50, 63, "#F05323", "#263B80"),
-    createClub("Orlando City", "MLS", "USA", 3, 50, 62, "#612B9B", "#F2C638"),
-    createClub("Philadelphia", "MLS", "USA", 3, 50, 61, "#071B2C", "#B19B69"),
-    createClub("Seattle", "MLS", "USA", 3, 55, 62, "#5D9741", "#00529B"),
-    createClub("Atlanta Utd", "MLS", "USA", 3, 55, 60, "#80000A", "#221F1F"),
-    createClub("NY Red Bulls", "MLS", "USA", 3, 50, 61, "#E31351", "#FFFFFF"),
-    createClub("Houston", "MLS", "USA", 3, 45, 59, "#101820", "#F4911E"),
-    createClub("Real Salt Lake", "MLS", "USA", 3, 45, 59, "#B30838", "#01426A"),
-    createClub("Nashville", "MLS", "USA", 3, 45, 58, "#ECE83A", "#1F1646"),
-    createClub("St. Louis", "MLS", "USA", 3, 40, 58, "#E82C3E", "#141D34"),
-    createClub("New England", "MLS", "USA", 3, 45, 57, "#CE0E2D", "#152C5A"),
-    createClub("Portland", "MLS", "USA", 3, 50, 58, "#004812", "#D69A00"),
-    createClub("Vancouver", "MLS", "USA", 3, 40, 56, "#00245E", "#9DC2EA"),
-    createClub("Minnesota", "MLS", "USA", 3, 40, 56, "#8CD2F4", "#231F20"),
-    createClub("Dallas", "MLS", "USA", 3, 45, 57, "#BF0D3E", "#00205B"),
-    createClub("Charlotte", "MLS", "USA", 3, 40, 55, "#1A85C8", "#000000"),
-
-    // --- BRAZIL (Serie A) ---
-    createClub("Flamengo", "Serie A", "Brazil", 2, 75, 76, "#C3281E", "#000000"),
-    createClub("Palmeiras", "Serie A", "Brazil", 2, 72, 75, "#006437", "#FFFFFF"),
-    createClub("Atletico MG", "Serie A", "Brazil", 2, 70, 72, "#000000", "#FFFFFF"),
-    createClub("Gremio", "Serie A", "Brazil", 2, 70, 71, "#0D80BF", "#000000"),
-    createClub("Botafogo", "Serie A", "Brazil", 2, 65, 70, "#000000", "#FFFFFF"),
-    createClub("Sao Paulo", "Serie A", "Brazil", 2, 70, 70, "#DA291C", "#FFFFFF"),
-    createClub("Fluminense", "Serie A", "Brazil", 2, 68, 70, "#9F002D", "#00913E"),
-    createClub("Internacional", "Serie A", "Brazil", 2, 68, 69, "#E30613", "#FFFFFF"),
-    createClub("Corinthians", "Serie A", "Brazil", 2, 70, 68, "#000000", "#FFFFFF"),
-    createClub("Vasco da Gama", "Serie A", "Brazil", 2, 65, 66, "#000000", "#FFFFFF"),
-    createClub("Cruzeiro", "Serie A", "Brazil", 2, 65, 66, "#005CA9", "#FFFFFF"),
-    createClub("Athletico PR", "Serie A", "Brazil", 2, 60, 67, "#C8102E", "#000000"),
-    createClub("Bahia", "Serie A", "Brazil", 2, 55, 64, "#003399", "#E30613"),
-    createClub("Fortaleza", "Serie A", "Brazil", 2, 55, 65, "#12284B", "#E30613"),
-    createClub("Bragantino", "Serie A", "Brazil", 2, 50, 64, "#FFFFFF", "#DA291C"),
-    createClub("Cuiaba", "Serie A", "Brazil", 2, 45, 60, "#015941", "#FDE910"),
-    createClub("Vitoria", "Serie A", "Brazil", 2, 45, 59, "#DA291C", "#000000"),
-    createClub("Juventude", "Serie A", "Brazil", 2, 40, 58, "#00913E", "#FFFFFF"),
-    createClub("Criciuma", "Serie A", "Brazil", 2, 40, 58, "#FDD116", "#000000"),
-    createClub("Atletico GO", "Serie A", "Brazil", 2, 40, 57, "#DA291C", "#000000"),
-
-    // --- ARGENTINA (Primera) ---
-    createClub("River Plate", "Primera Division", "Argentina", 2, 75, 74, "#FFFFFF", "#DA291C"),
-    createClub("Boca Juniors", "Primera Division", "Argentina", 2, 75, 72, "#003399", "#F7C403"),
-    createClub("Racing Club", "Primera Division", "Argentina", 2, 65, 68, "#6CABDD", "#FFFFFF"),
-    createClub("Independiente", "Primera Division", "Argentina", 2, 65, 66, "#DA291C", "#FFFFFF"),
-    createClub("San Lorenzo", "Primera Division", "Argentina", 2, 62, 65, "#003399", "#DA291C"),
-    createClub("Estudiantes", "Primera Division", "Argentina", 2, 60, 65, "#DA291C", "#FFFFFF"),
-    createClub("Talleres", "Primera Division", "Argentina", 2, 55, 64, "#003399", "#FFFFFF"),
-    createClub("Rosario Central", "Primera Division", "Argentina", 2, 55, 63, "#003399", "#F7C403"),
-    createClub("Velez Sarsfield", "Primera Division", "Argentina", 2, 58, 62, "#FFFFFF", "#003399"),
-    createClub("Argentinos Jrs", "Primera Division", "Argentina", 2, 50, 61, "#DA291C", "#FFFFFF"),
-    createClub("Lanus", "Primera Division", "Argentina", 2, 50, 61, "#931138", "#FFFFFF"),
-    createClub("Newell's", "Primera Division", "Argentina", 2, 52, 60, "#DA291C", "#000000"),
-    createClub("Defensa", "Primera Division", "Argentina", 2, 45, 60, "#00913E", "#F7C403"),
-    createClub("Huracan", "Primera Division", "Argentina", 2, 50, 59, "#FFFFFF", "#DA291C"),
-    createClub("Godoy Cruz", "Primera Division", "Argentina", 2, 45, 58, "#003399", "#FFFFFF"),
-    
-    // --- SCOTLAND ---
-    createClub("Celtic", "Premiership", "Scotland", 3, 75, 72, "#00804E", "#FFFFFF"),
-    createClub("Rangers", "Premiership", "Scotland", 3, 72, 70, "#1B458F", "#FFFFFF"),
-    createClub("Hearts", "Premiership", "Scotland", 4, 50, 58, "#79242F", "#FFFFFF"),
-    createClub("Aberdeen", "Premiership", "Scotland", 4, 50, 57, "#DA291C", "#FFFFFF"),
-    createClub("Kilmarnock", "Premiership", "Scotland", 4, 45, 55, "#005CA9", "#FFFFFF"),
-    createClub("St Mirren", "Premiership", "Scotland", 4, 42, 54, "#000000", "#FFFFFF"),
-    createClub("Dundee FC", "Premiership", "Scotland", 4, 40, 53, "#002147", "#FFFFFF"),
-    createClub("Hibernian", "Premiership", "Scotland", 4, 48, 56, "#00804E", "#FFFFFF"),
-    createClub("Motherwell", "Premiership", "Scotland", 4, 42, 53, "#F7C403", "#931138"),
-    createClub("Ross County", "Premiership", "Scotland", 4, 38, 50, "#002147", "#FFFFFF"),
-    createClub("St Johnstone", "Premiership", "Scotland", 4, 38, 49, "#005CA9", "#FFFFFF"),
-    createClub("Livingston", "Premiership", "Scotland", 4, 35, 48, "#F7C403", "#000000"),
-
-    // --- SAUDI ARABIA (Saudi Pro League) ---
-    createClub("Al-Hilal", "Saudi Pro League", "Saudi Arabia", 2, 75, 82, "#005CA9", "#FFFFFF"),
-    createClub("Al-Nassr", "Saudi Pro League", "Saudi Arabia", 2, 72, 80, "#FEF200", "#005CA9"),
-    createClub("Al-Ahli", "Saudi Pro League", "Saudi Arabia", 2, 68, 78, "#00804E", "#FFFFFF"),
-    createClub("Al-Ittihad", "Saudi Pro League", "Saudi Arabia", 2, 70, 78, "#FDB913", "#000000"),
-    createClub("Al-Ettifaq", "Saudi Pro League", "Saudi Arabia", 2, 55, 70, "#00804E", "#DA291C"),
-    createClub("Al-Shabab", "Saudi Pro League", "Saudi Arabia", 2, 55, 68, "#000000", "#FFFFFF"),
-    createClub("Al-Taawoun", "Saudi Pro League", "Saudi Arabia", 2, 50, 66, "#FEF200", "#000000"),
-    createClub("Al-Fateh", "Saudi Pro League", "Saudi Arabia", 2, 45, 62, "#00804E", "#005CA9"),
-    createClub("Al-Fayha", "Saudi Pro League", "Saudi Arabia", 2, 45, 60, "#F58113", "#003399"),
-    createClub("Damac", "Saudi Pro League", "Saudi Arabia", 2, 40, 58, "#DA291C", "#F7C403"),
-    createClub("Al-Riyadh", "Saudi Pro League", "Saudi Arabia", 2, 40, 56, "#DA291C", "#000000"),
-    createClub("Al-Khaleej", "Saudi Pro League", "Saudi Arabia", 2, 35, 55, "#FEF200", "#00804E"),
-
-    // --- JAPAN (J1 League) ---
-    createClub("Vissel Kobe", "J1 League", "Japan", 3, 60, 68, "#931138", "#FFFFFF"),
-    createClub("Yokohama F. M.", "J1 League", "Japan", 3, 65, 67, "#003399", "#DA291C"),
-    createClub("Kawasaki Frontale", "J1 League", "Japan", 3, 62, 66, "#009EE0", "#000000"),
-    createClub("Urawa Reds", "J1 League", "Japan", 3, 65, 65, "#DA291C", "#FFFFFF"),
-    createClub("Kashima Antlers", "J1 League", "Japan", 3, 60, 64, "#DA291C", "#000000"),
-    createClub("Nagoya Grampus", "J1 League", "Japan", 3, 55, 63, "#DA291C", "#F7C403"),
-    createClub("Sanfrecce Hiroshima", "J1 League", "Japan", 3, 58, 65, "#5E278E", "#FFFFFF"),
-    createClub("Gamba Osaka", "J1 League", "Japan", 3, 60, 62, "#003399", "#000000"),
-    createClub("FC Tokyo", "J1 League", "Japan", 3, 55, 61, "#003399", "#DA291C"),
-    createClub("Cerezo Osaka", "J1 League", "Japan", 3, 55, 62, "#F495BC", "#002D62"),
-
-    // --- AUSTRALIA (A-League) ---
-    createClub("Melbourne City", "A-League", "Australia", 4, 50, 62, "#6CABDD", "#FFFFFF"),
-    createClub("Sydney FC", "A-League", "Australia", 4, 55, 60, "#6CABDD", "#002147"),
-    createClub("Central Coast", "A-League", "Australia", 4, 45, 58, "#FEF200", "#002147"),
-    createClub("Melb Victory", "A-League", "Australia", 4, 52, 59, "#002147", "#FFFFFF"),
-    createClub("Adelaide Utd", "A-League", "Australia", 4, 45, 57, "#DA291C", "#F7C403"),
-    createClub("WS Wanderers", "A-League", "Australia", 4, 48, 58, "#DA291C", "#000000"),
-    createClub("Wellington", "A-League", "Australia", 4, 40, 56, "#FEF200", "#000000"),
-    createClub("Macarthur", "A-League", "Australia", 4, 40, 55, "#FFFFFF", "#000000"),
-    createClub("Brisbane Roar", "A-League", "Australia", 4, 45, 54, "#F58113", "#000000"),
-    createClub("Perth Glory", "A-League", "Australia", 4, 42, 53, "#582C83", "#F58113")
 ];
 
 export const FREE_AGENT_CLUB: Club = createClub("Free Agent", "None", "None", 5, 0, 0, "#334155", "#94a3b8");
 
 export const getClubsByTier = (tier: number) => REAL_CLUBS.filter(c => c.tier === tier);
-
-export const getSimilarClubs = (prestige: number, tier: number): Club[] => {
-    return REAL_CLUBS.filter(c => Math.abs(c.prestige - prestige) < 20 && Math.abs(c.tier - tier) <= 1);
-};
 
 export const getLeaguesByCountry = (country: string) => {
     const clubs = REAL_CLUBS.filter(c => c.country === country);
@@ -461,9 +144,4 @@ export const getLeaguesByCountry = (country: string) => {
 
 export const getAvailableCountries = () => {
     return Array.from(new Set(REAL_CLUBS.map(c => c.country))).sort();
-};
-
-export const getLeagueCountry = (league: string): string => {
-    const club = REAL_CLUBS.find(c => c.league === league);
-    return club ? club.country : "Unknown";
 };

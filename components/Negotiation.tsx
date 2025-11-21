@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Club, Offer } from '../types';
+import { Club, Offer, AppSettings } from '../types';
+import { formatCurrency } from '../utils/gameLogic';
 
 interface Props {
     club: Club;
@@ -11,12 +12,14 @@ interface Props {
     onCancel: () => void;
     isRenewal: boolean;
     initialPatience?: number;
+    settings?: AppSettings;
 }
 
-const Negotiation: React.FC<Props> = ({ club, marketValue, playerAge, currentWage, onComplete, onCancel, isRenewal, initialPatience = 3 }) => {
+const Negotiation: React.FC<Props> = ({ club, marketValue, playerAge, currentWage, onComplete, onCancel, isRenewal, initialPatience = 3, settings }) => {
     // Initial Offer Logic
     const baseWageOffer = isRenewal ? Math.round(currentWage * 1.1) : Math.round(marketValue / 500); // Rough heuristic
-    
+    const currency = settings?.currency || 'EUR';
+
     const [wage, setWage] = useState(baseWageOffer);
     const [years, setYears] = useState(isRenewal ? 2 : 3);
     const [wageRise, setWageRise] = useState(0);
@@ -26,14 +29,12 @@ const Negotiation: React.FC<Props> = ({ club, marketValue, playerAge, currentWag
     const [message, setMessage] = useState(isRenewal ? "We'd love to keep you." : "We are interested in your services.");
     const [status, setStatus] = useState<'active' | 'accepted' | 'rejected' | 'countered'>('active');
 
-    const MAX_YEARS = isRenewal ? 8 : 5; // Constraint: New transfers max 5 years
+    const MAX_YEARS = isRenewal ? 8 : 5; 
 
     const handleSubmit = () => {
-        // Negotiation Logic
         const maxWage = Math.round(baseWageOffer * 1.4); 
-        const maxRise = 10; // Club rarely gives more than 10% rise
+        const maxRise = 10; 
 
-        // Perfect match
         if (wage <= clubOffer.wage && years === clubOffer.years && wageRise <= clubOffer.wageRise) {
             setStatus('accepted');
             setMessage("We are happy to accept those terms. Welcome aboard!");
@@ -41,7 +42,6 @@ const Negotiation: React.FC<Props> = ({ club, marketValue, playerAge, currentWag
             return;
         }
 
-        // Decrease patience
         const newPatience = clubPatience - 1;
         setClubPatience(newPatience);
 
@@ -52,26 +52,22 @@ const Negotiation: React.FC<Props> = ({ club, marketValue, playerAge, currentWag
             return;
         }
 
-        // Club Counter Logic
         let newClubWage = clubOffer.wage;
         let newClubRise = clubOffer.wageRise;
         let msg = "";
 
-        // If user asks for crazy wage
         if (wage > maxWage) {
             msg = "That wage is simply too high for our budget.";
             newClubWage = Math.min(maxWage, clubOffer.wage + (maxWage - clubOffer.wage) / 2);
         } else {
-            // Meet in the middle
             newClubWage = Math.round((clubOffer.wage + wage) / 2);
         }
 
-        // If user asks for crazy rise
         if (wageRise > maxRise) {
             msg = msg || "We cannot sustain that kind of yearly increase.";
             newClubRise = Math.min(maxRise, Math.ceil((clubOffer.wageRise + wageRise) / 2));
         } else {
-             newClubRise = Math.max(clubOffer.wageRise, wageRise); // Usually accept rise if reasonable
+             newClubRise = Math.max(clubOffer.wageRise, wageRise); 
         }
 
         if (!msg) msg = "We can improve our offer, but that is our limit.";
@@ -101,7 +97,6 @@ const Negotiation: React.FC<Props> = ({ club, marketValue, playerAge, currentWag
                 </div>
 
                 <div className="p-6 space-y-6 overflow-y-auto">
-                    {/* Agent/Club Message */}
                     <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700 relative mt-2">
                         <div className="absolute -top-3 left-4 bg-blue-600 text-xs px-2 py-1 rounded text-white font-bold uppercase">
                             {club.name} Rep
@@ -111,7 +106,6 @@ const Negotiation: React.FC<Props> = ({ club, marketValue, playerAge, currentWag
                         </p>
                     </div>
 
-                    {/* Current Offer Table */}
                     <div className={`p-4 rounded-xl border-2 transition-all duration-300 ${
                         status === 'countered' 
                         ? 'bg-orange-900/20 border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.3)]' 
@@ -128,7 +122,7 @@ const Negotiation: React.FC<Props> = ({ club, marketValue, playerAge, currentWag
                             <div className="flex-1">
                                 <div className="text-xs uppercase text-slate-500 font-bold mb-1">Wage</div>
                                 <div className={`text-xl font-mono font-bold ${status === 'countered' ? 'text-orange-400' : 'text-green-400'}`}>
-                                    €{clubOffer.wage.toLocaleString()}/wk
+                                    {formatCurrency(clubOffer.wage, currency)}/wk
                                 </div>
                             </div>
                             <div className="w-px h-8 bg-slate-600"></div>
@@ -146,11 +140,10 @@ const Negotiation: React.FC<Props> = ({ club, marketValue, playerAge, currentWag
 
                     {status !== 'accepted' && status !== 'rejected' && (
                         <div className="space-y-5 pt-2">
-                            {/* WAGE SLIDER */}
                             <div>
                                 <label className="flex justify-between text-sm text-slate-300 mb-2 font-semibold">
                                     <span>Wage Request</span>
-                                    <span className="text-white">€{wage.toLocaleString()}</span>
+                                    <span className="text-white">{formatCurrency(wage, currency)}</span>
                                 </label>
                                 <input 
                                     type="range" 
@@ -163,7 +156,6 @@ const Negotiation: React.FC<Props> = ({ club, marketValue, playerAge, currentWag
                                 />
                             </div>
 
-                             {/* WAGE RISE SLIDER */}
                              <div>
                                 <label className="flex justify-between text-sm text-slate-300 mb-2 font-semibold">
                                     <span>Yearly Wage Rise %</span>
@@ -180,7 +172,6 @@ const Negotiation: React.FC<Props> = ({ club, marketValue, playerAge, currentWag
                                 />
                             </div>
 
-                            {/* YEARS BUTTONS */}
                             <div>
                                 <label className="flex justify-between text-sm text-slate-300 mb-2 font-semibold">
                                     <span>Contract Length</span>

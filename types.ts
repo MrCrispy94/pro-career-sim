@@ -20,7 +20,22 @@ export enum ContractType {
   PROFESSIONAL = 'Professional'
 }
 
+export enum ContinentalTier {
+  NONE = 0,
+  CONFERENCE = 1,
+  EUROPA = 2,
+  CHAMPIONS = 3
+}
+
+export type Currency = 'GBP' | 'EUR' | 'USD';
+
+export interface AppSettings {
+  scale: number; // 0.8 to 1.2
+  currency: Currency;
+}
+
 export interface Club {
+  id: string; // Unique ID for tracking
   name: string;
   league: string;
   country: string;
@@ -29,6 +44,7 @@ export interface Club {
   strength: number; // 1-100, determines league performance
   primaryColor: string; // Hex
   secondaryColor: string; // Hex
+  continentalTier: ContinentalTier;
 }
 
 export interface StatSet {
@@ -69,6 +85,7 @@ export interface LeagueRow {
   gd: number;
   points: number;
   isPlayerClub: boolean;
+  status?: 'PRO' | 'REL' | 'UCL' | 'UEL' | 'UECL'; // For coloring rows
 }
 
 export type WorldTables = Record<string, LeagueRow[]>;

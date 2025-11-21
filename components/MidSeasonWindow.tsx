@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Player, LeagueRow, SeasonStats, Offer, OfferType, PromisedRole, Club, ContractType, StatSet, Position } from '../types';
-import { calculateStars, getPromisedRole, calculateForm } from '../utils/gameLogic';
+import { Player, LeagueRow, SeasonStats, Offer, OfferType, PromisedRole, Club, ContractType, StatSet, Position, AppSettings } from '../types';
+import { calculateStars, getPromisedRole, calculateForm, formatCurrency } from '../utils/gameLogic';
 import { generateTransferOffers } from '../services/geminiService';
 import { getClubsByTier } from '../utils/clubData';
 import Negotiation from './Negotiation';
@@ -14,9 +14,10 @@ interface Props {
     currentYear: number;
     onSaveExit: () => void;
     onViewWorld: () => void;
+    settings: AppSettings;
 }
 
-const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, onContinue, currentYear, onSaveExit, onViewWorld }) => {
+const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, onContinue, currentYear, onSaveExit, onViewWorld, settings }) => {
     const [view, setView] = useState<'summary' | 'table' | 'offers'>('summary');
     const [activeStatTab, setActiveStatTab] = useState<'total' | 'league' | 'cup' | 'europe'>('total');
     const [offers, setOffers] = useState<Offer[]>([]);
@@ -156,6 +157,7 @@ const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, onContin
                     isRenewal={false}
                     onCancel={() => setNegotiatingOffer(null)}
                     onComplete={handleNegotiationComplete}
+                    settings={settings}
                 />
             )}
 
@@ -346,7 +348,7 @@ const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, onContin
                                                     <div className="text-xs text-slate-400">{offer.type} • {offer.club.league}</div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <div className="text-green-400 font-mono text-sm">€{offer.wage.toLocaleString()}/wk</div>
+                                                    <div className="text-green-400 font-mono text-sm">{formatCurrency(offer.wage, settings.currency)}/wk</div>
                                                     <button 
                                                         onClick={() => {
                                                             if (offer.type === OfferType.LOAN) {

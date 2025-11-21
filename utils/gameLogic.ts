@@ -1,10 +1,228 @@
 
-import { Position, Player, Club, SeasonStats, StatSet, PromisedRole, ContractType, LeagueRow, WorldTables } from "../types";
-import { REAL_CLUBS, FREE_AGENT_CLUB } from "./clubData";
-import { getRegion } from "./constants";
+import { Position, Player, Club, SeasonStats, StatSet, PromisedRole, ContractType, LeagueRow, WorldTables, Currency, ContinentalTier } from "../types";
+import { REAL_CLUBS, FREE_AGENT_CLUB, generateFillerClub } from "./clubData";
 
 const clamp = (num: number, min: number, max: number) => Math.min(Math.max(num, min), max);
 export const getRandomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+// --- CURRENCY HELPERS ---
+export const formatCurrency = (amount: number, currency: Currency): string => {
+    let val = amount;
+    let symbol = '£';
+
+    if (currency === 'EUR') {
+        val = amount * 1.15;
+        symbol = '€';
+    } else if (currency === 'USD') {
+        val = amount * 1.25;
+        symbol = '$';
+    }
+
+    // Format with commas
+    return `${symbol}${Math.round(val).toLocaleString()}`;
+};
+
+// --- WORLD GENERATION & PERSISTENCE ---
+
+// Defines the hierarchy of leagues for promotion/relegation
+const LEAGUE_HIERARCHY: Record<string, { tier: number, parent?: string, child?: string, size: number }> = {
+    "Premier League": { tier: 1, child: "Championship", size: 20 },
+    "Championship": { tier: 2, parent: "Premier League", child: "League One", size: 24 },
+    "League One": { tier: 3, parent: "Championship", child: "League Two", size: 24 },
+    "League Two": { tier: 4, parent: "League One", child: "National League", size: 24 },
+    "National League": { tier: 5, parent: "League Two", size: 24 },
+    
+    "La Liga": { tier: 1, child: "La Liga 2", size: 20 },
+    "La Liga 2": { tier: 2, parent: "La Liga", child: "Primera Fed", size: 22 },
+    "Primera Fed": { tier: 3, parent: "La Liga 2", size: 20 },
+
+    "Bundesliga": { tier: 1, child: "Bundesliga 2", size: 18 },
+    "Bundesliga 2": { tier: 2, parent: "Bundesliga", child: "3. Liga", size: 18 },
+    "3. Liga": { tier: 3, parent: "Bundesliga 2", size: 20 },
+
+    "Serie A": { tier: 1, child: "Serie B", size: 20 },
+    "Serie B": { tier: 2, parent: "Serie A", child: "Serie C", size: 20 },
+    "Serie C": { tier: 3, parent: "Serie B", size: 20 },
+
+    "Ligue 1": { tier: 1, child: "Ligue 2", size: 18 },
+    "Ligue 2": { tier: 2, parent: "Ligue 1", child: "National 1", size: 20 },
+    "National 1": { tier: 3, parent: "Ligue 2", size: 18 },
+};
+
+export const initializeWorldClubs = (): Club[] => {
+    // Merge REAL_CLUBS with generated ones to fill leagues
+    let allClubs = [...REAL_CLUBS];
+    const leagueCounts: Record<string, number> = {};
+    
+    // Count current real clubs
+    allClubs.forEach(c => {
+        leagueCounts[c.league] = (leagueCounts[c.league] || 0) + 1;
+    });
+
+    // Fill gaps
+    Object.keys(LEAGUE_HIERARCHY).forEach(leagueName => {
+        const config = LEAGUE_HIERARCHY[leagueName];
+        const currentCount = leagueCounts[leagueName] || 0;
+        const needed = config.size - currentCount;
+
+        if (needed > 0) {
+            // Find a country reference
+            const sampleClub = allClubs.find(c => c.league === leagueName);
+            const country = sampleClub ? sampleClub.country : "England"; // Default to England if new league
+
+            for (let i = 0; i < needed; i++) {
+                allClubs.push(generateFillerClub(leagueName, country, config.tier));
+            }
+        }
+    });
+
+    return allClubs;
+};
+
+export const processWorldSeasonEnd = (allClubs: Club[], currentWorldTables: WorldTables): Club[] => {
+    // 1. Apply Strength changes (RNG dynamic world)
+    const nextClubs = allClubs.map(c => ({
+        ...c,
+        strength: clamp(c.strength + getRandomInt(-3, 3), 10, 99),
+        continentalTier: ContinentalTier.NONE // Reset continental, recalculate below
+    }));
+
+    // 2. Process Promotion/Relegation based on Tables
+    Object.keys(currentWorldTables).forEach(leagueName => {
+        const table = currentWorldTables[leagueName];
+        const hierarchy = LEAGUE_HIERARCHY[leagueName];
+        
+        if (!hierarchy) return;
+
+        // Identify Promoted/Relegated Teams
+        // Logic: 
+        // Tier 1: Relegate bottom 3
+        // Tier 2-4: Promote top 3, Relegate bottom 3
+        // Tier 5: Promote top 3
+        
+        const isTopTier = hierarchy.tier === 1;
+        const isBottomTier = !hierarchy.child;
+
+        const promotedCount = 3;
+        const relegatedCount = 3;
+
+        // Sort table by pos just to be safe
+        const sortedTable = [...table].sort((a,b) => a.position - b.position);
+
+        // Teams moving UP (to Parent)
+        if (hierarchy.parent) {
+            const promoters = sortedTable.slice(0, promotedCount);
+            promoters.forEach(row => {
+                const clubIndex = nextClubs.findIndex(c => c.name === row.name);
+                if (clubIndex !== -1) {
+                    nextClubs[clubIndex].league = hierarchy.parent!;
+                    nextClubs[clubIndex].tier = hierarchy.tier - 1;
+                    nextClubs[clubIndex].strength += getRandomInt(2, 5); // Boost for promotion
+                }
+            });
+        }
+
+        // Teams moving DOWN (to Child)
+        if (hierarchy.child) {
+            const relegators = sortedTable.slice(sortedTable.length - relegatedCount);
+            relegators.forEach(row => {
+                const clubIndex = nextClubs.findIndex(c => c.name === row.name);
+                if (clubIndex !== -1) {
+                    nextClubs[clubIndex].league = hierarchy.child!;
+                    nextClubs[clubIndex].tier = hierarchy.tier + 1;
+                    nextClubs[clubIndex].strength -= getRandomInt(2, 5); // Penalty for relegation
+                }
+            });
+        }
+
+        // Continental Qualification (Only for Tier 1)
+        if (isTopTier) {
+            sortedTable.forEach((row, idx) => {
+                const clubIndex = nextClubs.findIndex(c => c.name === row.name);
+                if (clubIndex !== -1) {
+                    if (idx < 4) nextClubs[clubIndex].continentalTier = ContinentalTier.CHAMPIONS;
+                    else if (idx < 6) nextClubs[clubIndex].continentalTier = ContinentalTier.EUROPA;
+                    else if (idx === 6) nextClubs[clubIndex].continentalTier = ContinentalTier.CONFERENCE;
+                }
+            });
+        }
+    });
+
+    return nextClubs;
+};
+
+// --- SIMULATION ---
+
+export const generateWorldLeagues = (gamesPlayed: number, allClubs: Club[]): WorldTables => {
+    const worldTables: WorldTables = {};
+    
+    // Group by league
+    const leagues: Record<string, Club[]> = {};
+    allClubs.forEach(c => {
+        if (!leagues[c.league]) leagues[c.league] = [];
+        leagues[c.league].push(c);
+    });
+
+    Object.keys(leagues).forEach(leagueName => {
+        const teams = leagues[leagueName];
+        const tierBaseStrength = { 1: 82, 2: 72, 3: 62, 4: 52, 5: 42 }[teams[0].tier] || 40;
+
+        const table: LeagueRow[] = teams.map(team => {
+            const relativeStr = team.strength - tierBaseStrength;
+            let winProb = 0.35 + (relativeStr * 0.015);
+            let loseProb = 0.35 - (relativeStr * 0.015);
+            winProb = clamp(winProb, 0.1, 0.8);
+            loseProb = clamp(loseProb, 0.1, 0.8);
+            
+            let won = 0, drawn = 0, lost = 0;
+            if (gamesPlayed > 0) {
+                for(let i=0; i<gamesPlayed; i++) {
+                    const matchRng = Math.random();
+                    if (matchRng < winProb) won++;
+                    else if (matchRng < winProb + (1 - winProb - loseProb)) drawn++;
+                    else lost++;
+                }
+            }
+            
+            const points = (won * 3) + drawn;
+            const gd = Math.floor((won * 1.4) - (lost * 1.2) + getRandomInt(-3, 3));
+
+            return { 
+                position: 0, 
+                name: team.name, 
+                played: gamesPlayed, 
+                won, drawn, lost, gd, points, 
+                isPlayerClub: false 
+            };
+        });
+
+        table.sort((a, b) => b.points - a.points || b.gd - a.gd);
+        
+        // Add status flags
+        const leagueConfig = LEAGUE_HIERARCHY[leagueName];
+        const mappedTable = table.map((row, idx) => {
+            let status: 'PRO' | 'REL' | 'UCL' | 'UEL' | 'UECL' | undefined = undefined;
+            if (leagueConfig) {
+                if (leagueConfig.tier === 1) {
+                    if (idx < 4) status = 'UCL';
+                    else if (idx < 6) status = 'UEL';
+                    else if (idx === 6) status = 'UECL';
+                    else if (idx >= table.length - 3) status = 'REL';
+                } else {
+                    // Lower tiers
+                    if (idx < 3 && leagueConfig.parent) status = 'PRO';
+                    else if (idx >= table.length - 3 && leagueConfig.child) status = 'REL';
+                }
+            }
+            return { ...row, position: idx + 1, status };
+        });
+
+        worldTables[leagueName] = mappedTable;
+    });
+
+    return worldTables;
+};
+
 
 // --- VISUAL HELPERS ---
 export const getContrastColor = (hexcolor: string) => {
@@ -162,8 +380,6 @@ export const calculateForm = (stats: StatSet, position: Position): number => {
     return Math.max(1, Math.min(99, Math.round(base)));
 };
 
-// --- LEAGUE GENERATION ---
-
 export const getTierName = (tier: number): string => {
     switch(tier) {
         case 1: return "Premier Division";
@@ -175,114 +391,22 @@ export const getTierName = (tier: number): string => {
     }
 };
 
-export const handleClubProgression = (club: Club, position: number): Club => {
-    if (club.name === "Free Agent") return club;
-
-    let newTier = club.tier;
-    let newStrength = club.strength;
-    let newLeague = club.league;
-
-    // Promotion
-    if (position <= 3 && club.tier > 1) {
-        newTier -= 1;
-        newStrength += getRandomInt(3, 6); 
-        newLeague = getTierName(newTier);
-    } 
-    // Relegation
-    else if (position >= 18 && club.tier < 5) {
-        newTier += 1;
-        newStrength -= getRandomInt(3, 6); 
-        newLeague = getTierName(newTier);
-    } else {
-        if (position <= 6) newStrength += getRandomInt(0, 2);
-        if (position >= 15) newStrength -= getRandomInt(0, 2);
-    }
-
-    return {
-        ...club,
-        tier: newTier,
-        strength: clamp(newStrength, 20, 99),
-        league: newLeague
-    };
-};
-
-const simulateLeagueTable = (leagueName: string, tier: number, gamesPlayed: number): LeagueRow[] => {
-    const leagueSize = 20;
-    const realClubs = REAL_CLUBS.filter(c => c.league === leagueName);
-    const leagueTeams: { name: string, strength: number }[] = [];
-    
-    realClubs.forEach(c => {
-        leagueTeams.push({ name: c.name, strength: c.strength });
-    });
-
-    // Tier 1: 82, Tier 2: 72, Tier 3: 62, Tier 4: 52, Tier 5: 42
-    const tierBaseStrength = tier === 1 ? 82 : tier === 2 ? 72 : tier === 3 ? 62 : tier === 4 ? 52 : 42;
-
-    while (leagueTeams.length < leagueSize) {
-        leagueTeams.push({ 
-            name: `${leagueName} Team ${String.fromCharCode(65 + (leagueTeams.length - realClubs.length))}`, 
-            strength: tierBaseStrength + getRandomInt(-10, 10) 
-        });
-    }
-
-    const table: LeagueRow[] = leagueTeams.map(team => {
-        const relativeStr = team.strength - tierBaseStrength;
-        let winProb = 0.35 + (relativeStr * 0.015);
-        let loseProb = 0.35 - (relativeStr * 0.015);
-        winProb = clamp(winProb, 0.1, 0.8);
-        loseProb = clamp(loseProb, 0.1, 0.8);
-        
-        let won = 0, drawn = 0, lost = 0;
-        if (gamesPlayed > 0) {
-            for(let i=0; i<gamesPlayed; i++) {
-                const matchRng = Math.random();
-                if (matchRng < winProb) won++;
-                else if (matchRng < winProb + (1 - winProb - loseProb)) drawn++;
-                else lost++;
-            }
-        }
-        
-        const points = (won * 3) + drawn;
-        const gd = Math.floor((won * 1.4) - (lost * 1.2) + getRandomInt(-5, 5));
-
-        return { position: 0, name: team.name, played: gamesPlayed, won, drawn, lost, gd, points, isPlayerClub: false };
-    });
-
-    table.sort((a, b) => b.points - a.points || b.gd - a.gd);
-    return table.map((row, idx) => ({ ...row, position: idx + 1 }));
-};
-
-export const generateWorldLeagues = (gamesPlayed: number): WorldTables => {
-    const worldTables: WorldTables = {};
-    const allLeagues = Array.from(new Set(REAL_CLUBS.map(c => c.league)));
-    allLeagues.forEach(league => {
-        const sampleClub = REAL_CLUBS.find(c => c.league === league);
-        const tier = sampleClub ? sampleClub.tier : 2;
-        worldTables[league] = simulateLeagueTable(league, tier, gamesPlayed);
-    });
-    return worldTables;
-};
-
-export const generateLeagueTable = (myClub: Club, isMidSeason: boolean): LeagueRow[] => {
+export const generateLeagueTable = (myClub: Club, isMidSeason: boolean, allClubs: Club[]): LeagueRow[] => {
     if (myClub.name === "Free Agent") return [];
 
-    const leagueSize = 20;
     const gamesPlayed = isMidSeason ? 19 : 38;
-    const leagueTeams: { name: string, strength: number, isPlayer: boolean }[] = [];
-
-    leagueTeams.push({ name: myClub.name, strength: myClub.strength, isPlayer: true });
-    const realOpponents = REAL_CLUBS.filter(c => c.league === myClub.league && c.name !== myClub.name);
-    realOpponents.forEach(c => leagueTeams.push({ name: c.name, strength: c.strength, isPlayer: false }));
-
-    const tierBaseStrength = { 1: 82, 2: 72, 3: 62, 4: 52, 5: 42 }[myClub.tier] || 40;
-    while (leagueTeams.length < leagueSize) {
-        let str = tierBaseStrength + getRandomInt(-8, 8);
-        leagueTeams.push({ name: `Team ${String.fromCharCode(65 + leagueTeams.length)}`, strength: clamp(str, 10, 99), isPlayer: false });
-    }
     
-    const finalLeagueTeams = leagueTeams.slice(0, leagueSize);
-    const table: LeagueRow[] = finalLeagueTeams.map(team => {
-        const relativeStr = team.strength - tierBaseStrength;
+    // Filter clubs belonging to this league from the global list
+    const leagueTeams = allClubs.filter(c => c.league === myClub.league);
+    const tierBaseStrength = { 1: 82, 2: 72, 3: 62, 4: 52, 5: 42 }[myClub.tier] || 40;
+
+    // Simulate games for everyone in this league
+    const table: LeagueRow[] = leagueTeams.map(team => {
+        const isPlayer = team.name === myClub.name;
+        // If it's the player, we use their actual known strength
+        const strength = isPlayer ? myClub.strength : team.strength;
+
+        const relativeStr = strength - tierBaseStrength;
         let winProb = 0.35 + (relativeStr * 0.015);
         let loseProb = 0.35 - (relativeStr * 0.015);
         winProb = clamp(winProb, 0.1, 0.8);
@@ -301,7 +425,7 @@ export const generateLeagueTable = (myClub: Club, isMidSeason: boolean): LeagueR
         const points = (won * 3) + drawn;
         const gd = Math.floor((won * 1.4) - (lost * 1.2) + getRandomInt(-5, 5));
 
-        return { position: 0, name: team.name, played: gamesPlayed, won, drawn, lost, gd, points, isPlayerClub: team.isPlayer };
+        return { position: 0, name: team.name, played: gamesPlayed, won, drawn, lost, gd, points, isPlayerClub: isPlayer };
     });
 
     table.sort((a, b) => b.points - a.points || b.gd - a.gd);
@@ -320,7 +444,7 @@ const generateStatSet = (matches: number, ability: number, position: Position, o
     const perGamePerf = (effectiveAbility + (advantage/2)) / 100;
 
     let goals = 0, assists = 0, cleanSheets = 0;
-    const ratingBase = 6.4; // Raised from 6.0 to ensure better baseline ratings
+    const ratingBase = 6.4; 
 
     let startRatio = 0.5;
     if (matches > 25) startRatio = 0.9;
@@ -345,7 +469,7 @@ const generateStatSet = (matches: number, ability: number, position: Position, o
     } else if (position === Position.MID) {
         goals = Math.floor(effectiveMatches * perGamePerf * 0.25);
         assists = Math.floor(effectiveMatches * perGamePerf * 0.5);
-        cleanSheets = Math.floor(effectiveMatches * perGamePerf * 0.2); // Mids get some CS credit contextually
+        cleanSheets = Math.floor(effectiveMatches * perGamePerf * 0.2); 
     } else if (position === Position.DEF) {
         goals = Math.floor(effectiveMatches * perGamePerf * 0.06);
         assists = Math.floor(effectiveMatches * perGamePerf * 0.1);
@@ -362,7 +486,6 @@ const generateStatSet = (matches: number, ability: number, position: Position, o
     const assistRatio = matches > 0 ? assists / matches : 0;
     const csRatio = matches > 0 ? cleanSheets / matches : 0;
 
-    // Weighted rating boosts by position
     if (position === Position.FWD) {
         ratingBonus += goalRatio * 2.2;
         ratingBonus += assistRatio * 1.2;
@@ -371,27 +494,20 @@ const generateStatSet = (matches: number, ability: number, position: Position, o
         ratingBonus += assistRatio * 1.6;
         ratingBonus += csRatio * 0.4;
     } else if (position === Position.DEF) {
-        ratingBonus += csRatio * 1.8; // Defenders reward for CS
-        ratingBonus += goalRatio * 2.5; // Defenders reward heavily for goals
+        ratingBonus += csRatio * 1.8; 
+        ratingBonus += goalRatio * 2.5; 
         ratingBonus += assistRatio * 1.4;
     } else { // GK
         ratingBonus += csRatio * 2.2;
         ratingBonus += assistRatio * 3.0;
     }
 
-    // Advantage Bonus (Ability Diff)
-    // If diff is +10, bonus +0.4
     const diffBonus = advantage / 25; 
-
-    // Consistency / Random Factor
-    const variance = (Math.random() * 0.8) - 0.1; // -0.1 to +0.7
+    const variance = (Math.random() * 0.8) - 0.1; 
 
     let finalRating = ratingBase + ratingBonus + diffBonus + variance;
-    
-    // Cap unrealistic ratings but allow brilliance
     finalRating = clamp(finalRating, 5.5, 9.9);
 
-    // MOTM Calc
     let motm = 0;
     if (finalRating > 8.2) {
         motm = Math.floor(matches * 0.15 * (finalRating - 7.5)); 
@@ -435,26 +551,19 @@ export const simulateMatch = (player: Player, opponentStrength: number, isExtraT
     stats.minutes = minutes; 
     stats.starts = 1;
     
-    // Reconcile Stats with Score
     if (stats.goals > myScore) stats.goals = myScore;
     
     if (oppScore > 0) stats.cleanSheets = 0;
     else if (player.position === Position.GK || player.position === Position.DEF) stats.cleanSheets = 1;
     
-    // Reconcile Rating based on actual events vs projected
     let adjRating = stats.rating;
-    
-    // Bonus for scoring/assisting in THIS specific match (generateStatSet is avg based)
-    // If we actually scored (stats.goals > 0), ensure rating reflects it
     if (stats.goals > 0 && adjRating < 7.5) adjRating += 1.0;
     if (stats.assists > 0 && adjRating < 7.0) adjRating += 0.5;
     if (stats.cleanSheets > 0 && (player.position === Position.GK || player.position === Position.DEF) && adjRating < 7.0) adjRating += 0.5;
     
-    // Penalty for losing heavily
     if (oppScore > myScore + 2) adjRating -= 1.0;
     else if (oppScore > myScore) adjRating -= 0.3;
 
-    // Boost for winning
     if (myScore > oppScore) adjRating += 0.3;
 
     stats.rating = clamp(Number(adjRating.toFixed(2)), 5.0, 10.0);
@@ -501,23 +610,18 @@ export const calculateGrowth = (
     let log = "";
     let fatigueGain = 0;
 
-    // --- FREE AGENT PENALTY ---
     if (level === 'Free Agent') {
         growth = -getRandomInt(2, 4);
-        // High fatigue gain due to lack of facilities and mental stress
-        // Simulating 6 months of stress = +10 roughly
         fatigueGain = 8 + (fatigue * 0.1); 
         log = "Attributes declining without a club.";
     } else {
-        // Base Growth Factors
         const ratingFactor = (rating - 6.0) * 2;
         const matchFactor = Math.min(matches, 40) / 40;
         
-        // Age Curve
         if (age < 21) {
             growth = (getRandomInt(2, 5) + ratingFactor) * matchFactor;
             if (level === 'Senior' && matches > 10) growth *= 1.5; 
-            else if (level.includes('U18') || level.includes('U21')) growth *= 0.8; // Slower growth in youth
+            else if (level.includes('U18') || level.includes('U21')) growth *= 0.8; 
             log = "Developing well.";
         } else if (age < 28) {
             growth = (getRandomInt(0, 3) + ratingFactor) * matchFactor;
@@ -530,25 +634,18 @@ export const calculateGrowth = (
             log = "Physical decline.";
         }
 
-        // Body Load Impact on Growth
         if (fatigue > 85) {
             growth -= 2;
             log += " High body load hindering progress.";
         }
 
-        // Facilities Impact (Club Tier)
-        // Tier 1 (Elite) gives slight growth boost and better recovery
         if (currentClub.tier === 1) growth += 1;
         
-        // Fatigue Calculation from Matches
-        // Playing matches increases fatigue
-        // Base increased to 0.6 to ensure accumulation
         let matchLoad = (matches * 0.6) * (1 - (naturalFitness / 250)); 
         
         fatigueGain = matchLoad;
     }
     
-    // --- INJURY FATIGUE IMPACT ---
     if (seasonInjuries.length > 0) {
          seasonInjuries.forEach(inj => {
              if (inj.includes("ACL") || inj.includes("Broken") || inj.includes("Tear")) {
@@ -561,32 +658,24 @@ export const calculateGrowth = (
          });
     }
 
-    // Apply Growth
     let newCA = currentAbility + growth;
     if (newCA > potentialAbility) newCA = potentialAbility;
     if (newCA < 1) newCA = 1;
 
-    // Apply Fatigue
     let newFatigue = fatigue + fatigueGain;
     
-    // Recovery off-season (Natural)
-    // Only if not free agent
     if (level !== 'Free Agent') {
-        let recovery = 7 + (naturalFitness / 20); // Base recovery
-        // Better facilities help recovery
+        let recovery = 7 + (naturalFitness / 20); 
         const facilityBonus = currentClub.tier === 1 ? 3 : currentClub.tier === 2 ? 1.5 : 0;
         
-        // Life Event Recovery
         if (events.some(e => e.includes("physio") || e.includes("yoga") || e.includes("diet"))) {
             recovery += 5;
             log += " Lifestyle improvements aiding recovery.";
         }
 
-        // AGE PENALTY TO RECOVERY
-        // Older players recover significantly slower, leading to eventual retirement
         let agePenalty = 0;
         if (age > 29) {
-            agePenalty = (age - 29) * 1.0; // e.g. 34yo = -5 recovery
+            agePenalty = (age - 29) * 1.0; 
         }
 
         newFatigue = Math.max(0, newFatigue - (recovery + facilityBonus - agePenalty));
@@ -598,12 +687,11 @@ export const calculateGrowth = (
 
     return {
         newCA: clamp(Math.round(newCA), 1, 99),
-        newFatigue: Math.round(newFatigue), // Can go over 100
+        newFatigue: Math.round(newFatigue), 
         growthLog: log
     };
 };
 
-// --- CUP LOGIC ---
 const CUP_ROUNDS = ["Round 1", "Round 2", "Round 3", "Round 4", "Quarter Final", "Semi Final", "Final", "Winner"];
 const EUROPE_ROUNDS = ["Qualifying", "Group Stage", "Round of 16", "Quarter Final", "Semi Final", "Final", "Winner"];
 
@@ -664,6 +752,7 @@ export const calculateAwards = (player: Player, stats: SeasonStats, teamTrophies
 export const simulateSeasonPerformance = (
   player: Player,
   year: number,
+  allClubs: Club[],
   portion: number = 1.0, 
   prevStats?: SeasonStats,
   simulateSummerTournament: boolean = true
@@ -674,10 +763,7 @@ export const simulateSeasonPerformance = (
   const injuries: string[] = [];
   let weeksOut = 0;
 
-  // FREE AGENT SKIP LOGIC
   if (currentClub.name === "Free Agent") {
-      // Simulating 6 months of "nothingness"
-      // We return empty stats, but fatigue will increase via calculateGrowth later
       const emptyStats: StatSet = { matches: 0, starts: 0, minutes: 0, goals: 0, assists: 0, cleanSheets: 0, rating: 0, motm: 0 };
       return {
           stats: {
@@ -689,7 +775,7 @@ export const simulateSeasonPerformance = (
   }
 
   const isMidSeasonWindow = portion < 0.8 && !prevStats;
-  const leagueTable = generateLeagueTable(currentClub, isMidSeasonWindow);
+  const leagueTable = generateLeagueTable(currentClub, isMidSeasonWindow, allClubs);
   const myRow = leagueTable.find(r => r.isPlayerClub);
   const position = myRow ? myRow.position : 10;
 
@@ -698,14 +784,12 @@ export const simulateSeasonPerformance = (
       else if (position <= 4 && currentClub.tier === 1) events.push("Qualified for Champions League");
   }
 
-  // DETERMINING APPS BREAKDOWN
   let role = contract.promisedRole;
   const calculatedRole = getPromisedRole(currentAbility, currentClub.strength);
   let level: 'Senior' | 'U21' | 'U18' | 'Youth/Reserves' = 'Senior';
   
   let isSeniorRegular = true;
   
-  // Rules for youth status
   if (contract.type === ContractType.YOUTH && age < 18 && currentAbility < currentClub.strength - 10) {
       level = 'U18';
       isSeniorRegular = false;
@@ -720,7 +804,6 @@ export const simulateSeasonPerformance = (
       isSeniorRegular = false;
   }
 
-  // Mixed Season Logic
   let seniorPlayRatio = 0;
   let youthPlayRatio = 0;
 
@@ -728,25 +811,21 @@ export const simulateSeasonPerformance = (
       seniorPlayRatio = getEstimatedApps(role) / 45; 
       youthPlayRatio = 0;
   } else {
-      // Youth player
-      youthPlayRatio = 0.8; // Plays mostly youth games
-      // Random chance for senior breakthrough
+      youthPlayRatio = 0.8; 
       if (currentAbility > currentClub.strength - 15 && Math.random() > 0.6) {
-          seniorPlayRatio = 0.1 + (Math.random() * 0.15); // 10-25% games as senior sub
+          seniorPlayRatio = 0.1 + (Math.random() * 0.15); 
           events.push(`Made appearances for Senior Team`);
       }
   }
 
   if (player.isSurplus) {
-      seniorPlayRatio = 0.02; // Frozen out
-      youthPlayRatio = 0.5; // Demoted to reserves
+      seniorPlayRatio = 0.02; 
+      youthPlayRatio = 0.5; 
       events.push("Frozen out of squad");
   }
 
-  // --- INJURIES ---
   if (!player.config.modifiers.injuriesOff) {
-      let injuryRisk = (injuryProne * 0.5) + (fatigue * 0.8); // Higher risk with body load
-      // High load check
+      let injuryRisk = (injuryProne * 0.5) + (fatigue * 0.8); 
       if (fatigue > 85) injuryRisk *= 1.5;
       
       if (Math.random() * 1000 < injuryRisk) {
@@ -754,7 +833,6 @@ export const simulateSeasonPerformance = (
           let duration = 0;
           let type = "";
           
-          // Big injuries affect body load permanently (handled in fatigue calc if needed, here we just set outage)
           if (severity > 0.92) { duration = 24; type = "ACL Tear (6 months)"; events.push("Serious Injury: ACL Tear"); }
           else if (severity > 0.8) { duration = 12; type = "Broken Foot (3 months)"; }
           else if (severity > 0.5) { duration = 4; type = "Hamstring Strain (1 month)"; }
@@ -766,28 +844,23 @@ export const simulateSeasonPerformance = (
       }
   }
 
-  // available ratio
   const availableRatio = Math.max(0, 24 - weeksOut) / 24; 
 
-  // --- GAME GENERATION ---
   const leagueGamesTotal = Math.ceil(((isSeniorRegular ? 38 : 20) * portion) * availableRatio);
   
   const leagueAppsSenior = Math.floor(leagueGamesTotal * seniorPlayRatio);
   const leagueAppsYouth = Math.floor(leagueGamesTotal * youthPlayRatio);
 
-  // Sim Stats
   const oppositionStrengthSenior = currentClub.strength;
   const oppositionStrengthYouth = currentClub.strength - 20;
   
-  // Fatigue Performance Penalty
   let perfMod = 1.0;
   if (fatigue > 60) perfMod = 0.95;
-  if (fatigue > 85) perfMod = 0.80; // Harder with high load
+  if (fatigue > 85) perfMod = 0.80; 
 
   const leagueStatsSenior = generateStatSet(leagueAppsSenior, currentAbility * perfMod, player.position, oppositionStrengthSenior);
   const leagueStatsYouth = generateStatSet(leagueAppsYouth, currentAbility * perfMod, player.position, oppositionStrengthYouth);
 
-  // Cup/Europe only valid for Senior context usually, or specific youth cups
   const cupStatus = simulateCompetitionProgress("Round 3", CUP_ROUNDS, currentClub.strength, isMidSeasonWindow);
   const cupGames = isSeniorRegular ? getRandomInt(1, 4) : 0; 
   const cupStats = generateStatSet(cupGames, currentAbility * perfMod, player.position, oppositionStrengthSenior, true);
@@ -803,7 +876,6 @@ export const simulateSeasonPerformance = (
       if (cupStatus === "Winner") trophies.push("Domestic Cup Winner");
       if (europeStatus === "Winner") trophies.push(`Continental Cup Winner`);
       
-      // Random Life Events
       if (player.config.modifiers.randomLifeEvents && Math.random() < 0.2) {
          const recoveryEvents = ["Hired private physio", "Adopted new diet", "Started yoga"];
          const evt = recoveryEvents[getRandomInt(0, recoveryEvents.length - 1)];
@@ -811,8 +883,6 @@ export const simulateSeasonPerformance = (
       }
   }
 
-  // Aggregation
-  // TOTAL ONLY INCLUDES SENIOR APPS. Youth stats are separate.
   const totalStats: StatSet = {
       matches: leagueStatsSenior.matches + cupStats.matches + europeStats.matches + intStats.matches,
       starts: leagueStatsSenior.starts + cupStats.starts + europeStats.starts + intStats.starts,
@@ -830,7 +900,7 @@ export const simulateSeasonPerformance = (
   return {
       stats: { 
           total: totalStats, 
-          youth: leagueStatsYouth, // Separate Youth bucket
+          youth: leagueStatsYouth, 
           league: leagueStatsSenior, 
           cup: cupStats, 
           europe: europeStats, 

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { WorldTables } from '../types';
-import { getAvailableCountries, getLeaguesByCountry, getLeagueCountry } from '../utils/clubData';
+import { getAvailableCountries, getLeaguesByCountry } from '../utils/clubData';
 
 interface Props {
     worldTables: WorldTables;
@@ -107,8 +107,17 @@ const WorldLeagues: React.FC<Props> = ({ worldTables, onClose }) => {
                                         {currentRows.length > 0 ? (
                                             currentRows.map((row) => (
                                                 <tr key={row.name} className="hover:bg-slate-800 transition">
-                                                    <td className={`p-4 font-bold ${row.position <= 4 ? 'text-green-400' : row.position >= (currentRows.length - 3) ? 'text-red-400' : 'text-slate-500'}`}>
-                                                        {row.position}
+                                                    <td className="p-4">
+                                                        <div className={`w-6 h-6 flex items-center justify-center rounded font-bold text-xs ${
+                                                            row.status === 'UCL' ? 'bg-green-600 text-white' :
+                                                            row.status === 'UEL' ? 'bg-blue-600 text-white' :
+                                                            row.status === 'UECL' ? 'bg-orange-600 text-white' :
+                                                            row.status === 'PRO' ? 'bg-green-500 text-white' :
+                                                            row.status === 'REL' ? 'bg-red-600 text-white' :
+                                                            'text-slate-500'
+                                                        }`}>
+                                                            {row.position}
+                                                        </div>
                                                     </td>
                                                     <td className="p-4 font-bold text-slate-200">
                                                         {row.name}
@@ -131,6 +140,12 @@ const WorldLeagues: React.FC<Props> = ({ worldTables, onClose }) => {
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                        
+                        <div className="mt-4 flex gap-4 text-xs text-slate-500">
+                            <div className="flex items-center gap-1"><span className="w-2 h-2 bg-green-600 rounded-full"></span> Champions League / Promotion</div>
+                            <div className="flex items-center gap-1"><span className="w-2 h-2 bg-blue-600 rounded-full"></span> Europa League</div>
+                            <div className="flex items-center gap-1"><span className="w-2 h-2 bg-red-600 rounded-full"></span> Relegation</div>
                         </div>
                     </div>
                 </div>
