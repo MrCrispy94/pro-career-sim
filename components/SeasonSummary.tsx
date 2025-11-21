@@ -11,6 +11,7 @@ interface Props {
 
 const SeasonSummary: React.FC<Props> = ({ seasonData, narrative, growthLog, onContinue }) => {
   const [activeTab, setActiveTab] = useState<'total' | 'league' | 'cup' | 'europe' | 'int'>('total');
+  const isInEurope = !!seasonData.stats.europeCompetitionName;
 
   const renderStatGrid = (stats: StatSet) => (
     <div className="grid grid-cols-4 gap-4 text-center animate-fade-in">
@@ -45,6 +46,12 @@ const SeasonSummary: React.FC<Props> = ({ seasonData, narrative, growthLog, onCo
       }
   };
 
+  const visibleTabs = ['total', 'league', 'cup', 'int'];
+  if (isInEurope) {
+      // Insert europe before int
+      visibleTabs.splice(3, 0, 'europe');
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm p-4">
         <div className="bg-slate-800 rounded-3xl shadow-2xl max-w-2xl w-full border border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
@@ -62,17 +69,17 @@ const SeasonSummary: React.FC<Props> = ({ seasonData, narrative, growthLog, onCo
                 
                 {/* Tabs */}
                 <div className="flex space-x-2 bg-slate-900 p-1 rounded-lg">
-                    {(['total', 'league', 'cup', 'europe', 'int'] as const).map(tab => (
+                    {visibleTabs.map(tab => (
                         <button
                             key={tab}
-                            onClick={() => setActiveTab(tab)}
+                            onClick={() => setActiveTab(tab as any)}
                             className={`flex-1 py-2 text-xs font-bold uppercase rounded-md transition ${
                                 activeTab === tab 
                                 ? 'bg-slate-700 text-white shadow' 
                                 : 'text-slate-500 hover:text-slate-300'
                             }`}
                         >
-                            {tab === 'int' ? 'Intl' : tab}
+                            {tab === 'int' ? 'Intl' : tab === 'europe' && seasonData.stats.europeCompetitionName ? seasonData.stats.europeCompetitionName : tab}
                         </button>
                     ))}
                 </div>

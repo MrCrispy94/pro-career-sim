@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Player, GameState, Position, SeasonRecord, ContractType, PromisedRole, LeagueRow, SeasonStats, WorldTables, StatSet, GameConfig, AppSettings, Club } from './types';
-import { generateInitialClub, generateNarrative } from './services/geminiService';
-import { calculateGrowth, getRandomInt, simulateSeasonPerformance, calculateMarketValue, generateWorldLeagues, mergeStatSet, calculateAwards, calculateForm, initializeWorldClubs, processWorldSeasonEnd } from './utils/gameLogic';
+import { generateInitialClub, generateNarrative } from './services/simulationService';
+import { calculateGrowth, getRandomInt, simulateSeasonPerformance, calculateMarketValue, generateWorldLeagues, mergeStatSet, calculateAwards, calculateForm, initializeWorldClubs, processWorldSeasonEnd, generateEuropeanLeagueTable } from './utils/gameLogic';
 import { addToHallOfFame, saveGame, loadGame, getHallOfFame, exportSaveFile } from './utils/storage';
 import StartScreen from './components/StartScreen';
 import Dashboard from './components/Dashboard';
@@ -25,6 +25,7 @@ const App: React.FC = () => {
   
   const [midSeasonStats, setMidSeasonStats] = useState<SeasonStats | null>(null);
   const [midSeasonTable, setMidSeasonTable] = useState<LeagueRow[]>([]);
+  const [midSeasonEuropeTable, setMidSeasonEuropeTable] = useState<LeagueRow[]>([]);
   
   const [lastSeasonData, setLastSeasonData] = useState<{record: SeasonRecord, narrative: string, growthLog: string} | null>(null);
   const [hofPlayers, setHofPlayers] = useState<Player[]>([]);
@@ -59,7 +60,7 @@ const App: React.FC = () => {
 
   const handleSaveGame = () => {
       if (player) {
-          saveGame(player, currentYear, gameState, { midSeasonStats, midSeasonTable, lastSeasonData, currentWorldTables, worldClubs });
+          saveGame(player, currentYear, gameState, { midSeasonStats, midSeasonTable, midSeasonEuropeTable, lastSeasonData, currentWorldTables, worldClubs });
           alert("Game Saved Successfully! (Stored in Browser)");
           setHasSave(true);
       }
@@ -67,7 +68,7 @@ const App: React.FC = () => {
 
   const handleExportSave = () => {
       if (player) {
-          exportSaveFile(player, currentYear, gameState, { midSeasonStats, midSeasonTable, lastSeasonData, currentWorldTables, worldClubs });
+          exportSaveFile(player, currentYear, gameState, { midSeasonStats, midSeasonTable, midSeasonEuropeTable, lastSeasonData, currentWorldTables, worldClubs });
       }
   };
 
@@ -86,6 +87,7 @@ const App: React.FC = () => {
                   if (json.midSeasonData) {
                       setMidSeasonStats(json.midSeasonData.midSeasonStats);
                       setMidSeasonTable(json.midSeasonData.midSeasonTable);
+                      setMidSeasonEuropeTable(json.midSeasonData.midSeasonEuropeTable || []);
                       setLastSeasonData(json.midSeasonData.lastSeasonData);
                       if (json.midSeasonData.worldClubs) {
                           setWorldClubs(json.midSeasonData.worldClubs);
@@ -125,6 +127,7 @@ const App: React.FC = () => {
           if (saveData.midSeasonData) {
               setMidSeasonStats(saveData.midSeasonData.midSeasonStats);
               setMidSeasonTable(saveData.midSeasonData.midSeasonTable);
+              setMidSeasonEuropeTable(saveData.midSeasonData.midSeasonEuropeTable || []);
               setLastSeasonData(saveData.midSeasonData.lastSeasonData);
               
               if (saveData.midSeasonData.worldClubs) {
@@ -223,6 +226,14 @@ const App: React.FC = () => {
 
         setMidSeasonStats(performance.stats);
         setMidSeasonTable(performance.leagueTable);
+        
+        // European Table
+        if (performance.stats.europeCompetitionName) {
+            setMidSeasonEuropeTable(generateEuropeanLeagueTable(player.currentClub, 6, worldClubs, performance.stats.europeCompetitionName));
+        } else {
+            setMidSeasonEuropeTable([]);
+        }
+
         setCurrentWorldTables(worldTables);
 
         setIsLoading(false);
@@ -472,6 +483,7 @@ const App: React.FC = () => {
                 player={player} 
                 stats={midSeasonStats} 
                 leagueTable={midSeasonTable} 
+                europeTable={midSeasonEuropeTable}
                 onContinue={handleMidSeasonContinue} 
                 currentYear={currentYear} 
                 onSaveExit={handleSaveGame} 

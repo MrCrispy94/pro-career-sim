@@ -232,99 +232,122 @@ const Dashboard: React.FC<Props> = ({ player, currentYear, onSimulate, onChangeS
 
   const renderHistory = () => (
       <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden animate-fade-in">
-          <table className="w-full text-sm text-left">
-              <thead className="bg-slate-900 text-slate-400 font-bold uppercase text-xs">
-                  <tr>
-                      <th className="p-4">Year</th>
-                      <th className="p-4">Age</th>
-                      <th className="p-4">Club</th>
-                      <th className="p-4 text-center">Apps</th>
-                      <th className="p-4 text-center">{player.position === Position.GK ? 'CS' : 'Goals'}</th>
-                      <th className="p-4 text-center">Ast</th>
-                      <th className="p-4 text-center">Rat</th>
-                      <th className="p-4">Achievements</th>
-                  </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700">
-                  {[...player.history].reverse().map((h, i) => {
-                      const playedSenior = h.stats.total.matches > 0;
-                      const isExpanded = expandedSeason === i;
+          <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-900 text-slate-400 font-bold uppercase text-xs">
+                      <tr>
+                          <th className="p-4">Year</th>
+                          <th className="p-4">Club</th>
+                          <th className="p-4">League</th>
+                          <th className="p-4">Europe</th>
+                          <th className="p-4 text-center">Apps</th>
+                          <th className="p-4 text-center">{player.position === Position.GK ? 'CS' : 'Gls'}</th>
+                          <th className="p-4 text-center">Ast</th>
+                          <th className="p-4 text-center">Rat</th>
+                          <th className="p-4">Achievements</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                      {[...player.history].reverse().map((h, i) => {
+                          const playedSenior = h.stats.total.matches > 0;
+                          const isExpanded = expandedSeason === i;
+                          
+                          let europeBadge = null;
+                          if (h.stats.europeCompetitionName) {
+                               const won = h.trophies.some(t => t.includes("Winner") && (t.includes("Champions") || t.includes("Europa") || t.includes("Conference")));
+                               const colorClass = h.stats.europeCompetitionName === "UCL" ? "bg-blue-900 text-blue-200 border-blue-700" : 
+                                                  h.stats.europeCompetitionName === "UEL" ? "bg-orange-900 text-orange-200 border-orange-700" :
+                                                  "bg-green-900 text-green-200 border-green-700";
+                               
+                               europeBadge = (
+                                   <div className={`text-[10px] px-2 py-0.5 rounded border ${colorClass} inline-flex items-center gap-1`}>
+                                       <span className="font-bold">{h.stats.europeCompetitionName}</span>
+                                       {won && <span>🏆</span>}
+                                       {!won && h.stats.europeStatus.includes("Eliminated") && <span className="opacity-70">{h.stats.europeStatus.replace("Eliminated in ", "")}</span>}
+                                   </div>
+                               );
+                          }
 
-                      return (
-                      <React.Fragment key={i}>
-                        <tr onClick={() => toggleSeason(i)} className={`cursor-pointer transition ${isExpanded ? 'bg-slate-700' : 'hover:bg-slate-700/50'}`}>
-                            <td className="p-4 font-mono text-slate-300">{h.year}</td>
-                            <td className="p-4 text-slate-400">{h.age}</td>
-                            <td className="p-4 font-bold text-white flex flex-col">
-                                <div className="flex items-center gap-2">
-                                    {h.club.name}
-                                    {h.isLoan && <span className="text-[10px] bg-yellow-600 text-white px-1 rounded">LOAN</span>}
-                                    {isExpanded ? <span className="text-xs">▼</span> : <span className="text-xs text-slate-500">▶</span>}
-                                </div>
-                                {!playedSenior && h.stats.youth.matches > 0 && (
-                                    <span className="text-[10px] text-slate-500 italic">Played in Youth/Reserves</span>
-                                )}
-                                {!playedSenior && h.stats.level === 'Free Agent' && (
-                                    <span className="text-[10px] text-slate-500 italic">Free Agent</span>
-                                )}
-                            </td>
-                            <td className="p-4 text-center text-slate-300">{h.stats.total.matches}</td>
-                            <td className="p-4 text-center text-green-400">{player.position === Position.GK ? h.stats.total.cleanSheets : h.stats.total.goals}</td>
-                            <td className="p-4 text-center text-blue-400">{h.stats.total.assists}</td>
-                            <td className="p-4 text-center font-bold text-yellow-400">{playedSenior ? h.stats.total.rating : '-'}</td>
-                            <td className="p-4">
-                                <div className="flex flex-wrap gap-1">
-                                    {h.trophies.map((t, idx) => (
-                                        <span key={idx} className="text-[10px] border border-yellow-500/30 text-yellow-500 px-1.5 py-0.5 rounded" title={t}>🏆</span>
-                                    ))}
-                                    {h.stats.awards.map((a, idx) => (
-                                        <span key={`aw-${idx}`} className="text-[10px] border border-blue-500/30 text-blue-400 px-1.5 py-0.5 rounded" title={a}>🏅</span>
-                                    ))}
-                                    {h.leaguePosition === 1 && <span className="text-[10px] bg-green-900/50 text-green-400 px-1.5 py-0.5 rounded">1st</span>}
-                                </div>
-                            </td>
-                        </tr>
-                        {isExpanded && (
-                            <tr className="bg-slate-900/50">
-                                <td colSpan={8} className="p-4">
-                                    <div className="grid grid-cols-5 gap-2 text-xs text-center">
-                                        <div className="font-bold text-slate-500 uppercase">Comp</div>
-                                        <div className="font-bold text-slate-500 uppercase">Apps</div>
-                                        <div className="font-bold text-slate-500 uppercase">Goals</div>
-                                        <div className="font-bold text-slate-500 uppercase">Ast</div>
-                                        <div className="font-bold text-slate-500 uppercase">Rat</div>
-
-                                        <div className="text-slate-300 text-left pl-2">League</div>
-                                        <div className="text-slate-300">{h.stats.league.matches}</div>
-                                        <div className="text-slate-300">{h.stats.league.goals}</div>
-                                        <div className="text-slate-300">{h.stats.league.assists}</div>
-                                        <div className="text-slate-300">{h.stats.league.rating}</div>
-
-                                        <div className="text-slate-300 text-left pl-2">Cup</div>
-                                        <div className="text-slate-300">{h.stats.cup.matches}</div>
-                                        <div className="text-slate-300">{h.stats.cup.goals}</div>
-                                        <div className="text-slate-300">{h.stats.cup.assists}</div>
-                                        <div className="text-slate-300">{h.stats.cup.rating}</div>
-
-                                        <div className="text-slate-300 text-left pl-2">Europe</div>
-                                        <div className="text-slate-300">{h.stats.europe.matches}</div>
-                                        <div className="text-slate-300">{h.stats.europe.goals}</div>
-                                        <div className="text-slate-300">{h.stats.europe.assists}</div>
-                                        <div className="text-slate-300">{h.stats.europe.rating}</div>
-
-                                        <div className="text-slate-300 text-left pl-2">Intl</div>
-                                        <div className="text-slate-300">{h.stats.international.matches}</div>
-                                        <div className="text-slate-300">{h.stats.international.goals}</div>
-                                        <div className="text-slate-300">{h.stats.international.assists}</div>
-                                        <div className="text-slate-300">{h.stats.international.rating}</div>
+                          return (
+                          <React.Fragment key={i}>
+                            <tr onClick={() => toggleSeason(i)} className={`cursor-pointer transition ${isExpanded ? 'bg-slate-700' : 'hover:bg-slate-700/50'}`}>
+                                <td className="p-4 font-mono text-slate-300 whitespace-nowrap">
+                                    {h.year} <span className="text-slate-500 text-xs">({h.age})</span>
+                                </td>
+                                <td className="p-4 font-bold text-white">
+                                    <div className="flex items-center gap-2">
+                                        {h.club.name}
+                                        {h.isLoan && <span className="text-[10px] bg-yellow-600 text-white px-1 rounded">LOAN</span>}
+                                        {isExpanded ? <span className="text-xs">▼</span> : <span className="text-xs text-slate-500">▶</span>}
+                                    </div>
+                                    {!playedSenior && h.stats.youth.matches > 0 && (
+                                        <span className="text-[10px] text-slate-500 italic block mt-1">Played in Youth/Reserves</span>
+                                    )}
+                                </td>
+                                <td className="p-4 text-slate-300 whitespace-nowrap">
+                                    {h.club.league}
+                                    {h.leaguePosition > 0 && <span className={`ml-2 text-[10px] font-bold px-1.5 rounded ${h.leaguePosition === 1 ? 'bg-green-500 text-black' : 'bg-slate-600 text-white'}`}>{h.leaguePosition}{h.leaguePosition === 1 ? 'st' : h.leaguePosition === 2 ? 'nd' : h.leaguePosition === 3 ? 'rd' : 'th'}</span>}
+                                </td>
+                                <td className="p-4">
+                                    {europeBadge || <span className="text-slate-600 text-xs">-</span>}
+                                </td>
+                                <td className="p-4 text-center text-slate-300">{h.stats.total.matches}</td>
+                                <td className="p-4 text-center text-green-400">{player.position === Position.GK ? h.stats.total.cleanSheets : h.stats.total.goals}</td>
+                                <td className="p-4 text-center text-blue-400">{h.stats.total.assists}</td>
+                                <td className="p-4 text-center font-bold text-yellow-400">{playedSenior ? h.stats.total.rating : '-'}</td>
+                                <td className="p-4">
+                                    <div className="flex flex-wrap gap-1">
+                                        {h.trophies.map((t, idx) => (
+                                            <span key={idx} className="text-[10px] border border-yellow-500/30 text-yellow-500 px-1.5 py-0.5 rounded" title={t}>🏆</span>
+                                        ))}
+                                        {h.stats.awards.map((a, idx) => (
+                                            <span key={`aw-${idx}`} className="text-[10px] border border-blue-500/30 text-blue-400 px-1.5 py-0.5 rounded" title={a}>🏅</span>
+                                        ))}
                                     </div>
                                 </td>
                             </tr>
-                        )}
-                      </React.Fragment>
-                  )})}
-              </tbody>
-          </table>
+                            {isExpanded && (
+                                <tr className="bg-slate-900/50">
+                                    <td colSpan={9} className="p-4">
+                                        <div className="grid grid-cols-5 gap-2 text-xs text-center">
+                                            <div className="font-bold text-slate-500 uppercase">Comp</div>
+                                            <div className="font-bold text-slate-500 uppercase">Apps</div>
+                                            <div className="font-bold text-slate-500 uppercase">Goals</div>
+                                            <div className="font-bold text-slate-500 uppercase">Ast</div>
+                                            <div className="font-bold text-slate-500 uppercase">Rat</div>
+
+                                            <div className="text-slate-300 text-left pl-2">League</div>
+                                            <div className="text-slate-300">{h.stats.league.matches}</div>
+                                            <div className="text-slate-300">{h.stats.league.goals}</div>
+                                            <div className="text-slate-300">{h.stats.league.assists}</div>
+                                            <div className="text-slate-300">{h.stats.league.rating}</div>
+
+                                            <div className="text-slate-300 text-left pl-2">Cup</div>
+                                            <div className="text-slate-300">{h.stats.cup.matches}</div>
+                                            <div className="text-slate-300">{h.stats.cup.goals}</div>
+                                            <div className="text-slate-300">{h.stats.cup.assists}</div>
+                                            <div className="text-slate-300">{h.stats.cup.rating}</div>
+
+                                            <div className="text-slate-300 text-left pl-2">Europe</div>
+                                            <div className="text-slate-300">{h.stats.europe.matches}</div>
+                                            <div className="text-slate-300">{h.stats.europe.goals}</div>
+                                            <div className="text-slate-300">{h.stats.europe.assists}</div>
+                                            <div className="text-slate-300">{h.stats.europe.rating}</div>
+
+                                            <div className="text-slate-300 text-left pl-2">Intl</div>
+                                            <div className="text-slate-300">{h.stats.international.matches}</div>
+                                            <div className="text-slate-300">{h.stats.international.goals}</div>
+                                            <div className="text-slate-300">{h.stats.international.assists}</div>
+                                            <div className="text-slate-300">{h.stats.international.rating}</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                          </React.Fragment>
+                      )})}
+                  </tbody>
+              </table>
+          </div>
       </div>
   );
 

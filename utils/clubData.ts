@@ -113,6 +113,7 @@ export const REAL_CLUBS: Club[] = [
     createClub("Stuttgart", "Bundesliga", "Germany", 1, 72, 84, "#FFFFFF", "#E32219", ContinentalTier.CHAMPIONS),
     createClub("RB Leipzig", "Bundesliga", "Germany", 1, 82, 84, "#DD013F", "#FFFFFF", ContinentalTier.CHAMPIONS),
     createClub("Dortmund", "Bundesliga", "Germany", 1, 88, 87, "#FDE100", "#000000", ContinentalTier.EUROPA),
+    createClub("Frankfurt", "Bundesliga", "Germany", 1, 76, 79, "#000000", "#E1000F", ContinentalTier.EUROPA),
 
     // --- ITALY (Serie A) ---
     createClub("Inter Milan", "Serie A", "Italy", 1, 90, 91, "#0068A8", "#221F20", ContinentalTier.CHAMPIONS),
@@ -121,6 +122,7 @@ export const REAL_CLUBS: Club[] = [
     createClub("Bologna", "Serie A", "Italy", 1, 65, 80, "#1A2F48", "#A6192E", ContinentalTier.CHAMPIONS),
     createClub("Roma", "Serie A", "Italy", 1, 82, 81, "#8E252F", "#F0BC42", ContinentalTier.EUROPA),
     createClub("Atalanta", "Serie A", "Italy", 1, 76, 80, "#1E71B8", "#000000", ContinentalTier.EUROPA),
+    createClub("Napoli", "Serie A", "Italy", 1, 84, 83, "#008FD4", "#FFFFFF", ContinentalTier.CONFERENCE),
 
     // --- FRANCE (Ligue 1) ---
     createClub("PSG", "Ligue 1", "France", 1, 94, 92, "#004170", "#DA291C", ContinentalTier.CHAMPIONS),
@@ -131,6 +133,82 @@ export const REAL_CLUBS: Club[] = [
     createClub("Lens", "Ligue 1", "France", 1, 70, 74, "#E30613", "#F7C403"),
     createClub("Marseille", "Ligue 1", "France", 1, 80, 78, "#2FAEE0", "#FFFFFF"),
     createClub("Lyon", "Ligue 1", "France", 1, 82, 76, "#14387F", "#D52B1E"),
+
+    // --- PORTUGAL ---
+    createClub("Sporting CP", "Primeira Liga", "Portugal", 1, 78, 82, "#00804E", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Benfica", "Primeira Liga", "Portugal", 1, 80, 81, "#E30613", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Porto", "Primeira Liga", "Portugal", 1, 80, 80, "#0053A0", "#FFFFFF", ContinentalTier.EUROPA),
+    createClub("Braga", "Primeira Liga", "Portugal", 1, 70, 75, "#E30613", "#FFFFFF", ContinentalTier.CONFERENCE),
+    createClub("Vitoria SC", "Primeira Liga", "Portugal", 1, 65, 72, "#000000", "#FFFFFF"),
+
+    // --- NETHERLANDS ---
+    createClub("PSV", "Eredivisie", "Netherlands", 1, 75, 80, "#DA291C", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Feyenoord", "Eredivisie", "Netherlands", 1, 74, 79, "#E30613", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Ajax", "Eredivisie", "Netherlands", 1, 82, 76, "#DA291C", "#FFFFFF", ContinentalTier.EUROPA),
+    createClub("AZ Alkmaar", "Eredivisie", "Netherlands", 1, 70, 74, "#DA291C", "#FFFFFF", ContinentalTier.CONFERENCE),
+    createClub("Twente", "Eredivisie", "Netherlands", 1, 68, 73, "#DA291C", "#FFFFFF"),
+
+    // --- BELGIUM ---
+    createClub("Club Brugge", "Pro League", "Belgium", 1, 70, 75, "#000000", "#0070B5", ContinentalTier.CHAMPIONS),
+    createClub("Anderlecht", "Pro League", "Belgium", 1, 72, 74, "#4F2D7F", "#FFFFFF", ContinentalTier.EUROPA),
+    createClub("Union SG", "Pro League", "Belgium", 1, 65, 73, "#FFD700", "#0000CD", ContinentalTier.CONFERENCE),
+    createClub("Genk", "Pro League", "Belgium", 1, 65, 72, "#0053A0", "#FFFFFF"),
+
+    // --- SCOTLAND ---
+    createClub("Celtic", "Scottish Premiership", "Scotland", 1, 75, 76, "#00804E", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Rangers", "Scottish Premiership", "Scotland", 1, 75, 75, "#1B458F", "#FFFFFF", ContinentalTier.EUROPA),
+
+    // --- AUSTRIA ---
+    createClub("RB Salzburg", "Austrian Bundesliga", "Austria", 1, 72, 76, "#DA291C", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Sturm Graz", "Austrian Bundesliga", "Austria", 1, 65, 72, "#000000", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("LASK", "Austrian Bundesliga", "Austria", 1, 62, 70, "#000000", "#FFFFFF", ContinentalTier.EUROPA),
+
+    // --- UKRAINE ---
+    createClub("Shakhtar", "Ukrainian Premier League", "Ukraine", 1, 74, 75, "#F36F21", "#000000", ContinentalTier.CHAMPIONS),
+    createClub("Dynamo Kyiv", "Ukrainian Premier League", "Ukraine", 1, 72, 73, "#FFFFFF", "#19407F", ContinentalTier.EUROPA),
+
+    // --- TURKEY ---
+    createClub("Galatasaray", "Super Lig", "Turkey", 1, 75, 78, "#A90432", "#FDB912", ContinentalTier.CHAMPIONS),
+    createClub("Fenerbahce", "Super Lig", "Turkey", 1, 75, 77, "#002D72", "#FFED00", ContinentalTier.EUROPA),
+    createClub("Besiktas", "Super Lig", "Turkey", 1, 72, 75, "#000000", "#FFFFFF", ContinentalTier.CONFERENCE),
+
+    // --- GREECE ---
+    createClub("Olympiacos", "Super League Greece", "Greece", 1, 70, 74, "#DA291C", "#FFFFFF", ContinentalTier.CONFERENCE),
+    createClub("PAOK", "Super League Greece", "Greece", 1, 68, 73, "#000000", "#FFFFFF", ContinentalTier.CONFERENCE),
+    createClub("AEK Athens", "Super League Greece", "Greece", 1, 68, 72, "#FFD700", "#000000"),
+    createClub("Panathinaikos", "Super League Greece", "Greece", 1, 68, 72, "#00804E", "#FFFFFF"),
+
+    // --- DENMARK ---
+    createClub("FC Copenhagen", "Superliga", "Denmark", 1, 68, 72, "#FFFFFF", "#0053A0", ContinentalTier.CONFERENCE),
+    createClub("Midtjylland", "Superliga", "Denmark", 1, 65, 70, "#000000", "#DA291C"),
+    createClub("Brondby", "Superliga", "Denmark", 1, 62, 68, "#FFD700", "#003399"),
+
+    // --- CZECH REPUBLIC ---
+    createClub("Sparta Prague", "Czech First League", "Czech Republic", 1, 68, 72, "#AC1E23", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Slavia Prague", "Czech First League", "Czech Republic", 1, 68, 72, "#DA291C", "#FFFFFF", ContinentalTier.EUROPA),
+    createClub("Viktoria Plzen", "Czech First League", "Czech Republic", 1, 65, 70, "#003399", "#DA291C", ContinentalTier.CONFERENCE),
+
+    // --- POLAND ---
+    createClub("Lech Poznan", "Ekstraklasa", "Poland", 1, 60, 68, "#0053A0", "#FFFFFF"),
+    createClub("Rakow", "Ekstraklasa", "Poland", 1, 58, 67, "#DA291C", "#0053A0"),
+    createClub("Legia Warsaw", "Ekstraklasa", "Poland", 1, 62, 69, "#000000", "#FFFFFF", ContinentalTier.CONFERENCE),
+
+    // --- SWEDEN ---
+    createClub("Malmo FF", "Allsvenskan", "Sweden", 1, 62, 69, "#6CABDD", "#FFFFFF", ContinentalTier.CHAMPIONS),
+    createClub("Elfsborg", "Allsvenskan", "Sweden", 1, 58, 65, "#FFD700", "#000000"),
+    createClub("Djurgarden", "Allsvenskan", "Sweden", 1, 58, 66, "#003399", "#6CABDD"),
+
+    // --- ROMANIA ---
+    createClub("FCSB", "Liga I", "Romania", 1, 60, 66, "#DA291C", "#003399"),
+    createClub("CFR Cluj", "Liga I", "Romania", 1, 62, 67, "#800000", "#FFFFFF"),
+    
+    // --- SWITZERLAND ---
+    createClub("Young Boys", "Swiss Super League", "Switzerland", 1, 65, 71, "#FFED00", "#000000", ContinentalTier.CHAMPIONS),
+    createClub("Basel", "Swiss Super League", "Switzerland", 1, 65, 68, "#DA291C", "#003399"),
+    createClub("Servette", "Swiss Super League", "Switzerland", 1, 60, 67, "#800000", "#FFFFFF"),
+
+    // --- SLOVAKIA ---
+    createClub("Slovan Bratislava", "Nike Liga", "Slovakia", 1, 55, 65, "#6CABDD", "#FFFFFF", ContinentalTier.CHAMPIONS),
 ];
 
 export const FREE_AGENT_CLUB: Club = createClub("Free Agent", "None", "None", 5, 0, 0, "#334155", "#94a3b8");

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Player, LeagueRow, SeasonStats, Offer, OfferType, PromisedRole, Club, ContractType, StatSet, Position, AppSettings } from '../types';
 import { calculateStars, getPromisedRole, calculateForm, formatCurrency } from '../utils/gameLogic';
-import { generateTransferOffers } from '../services/geminiService';
+import { generateTransferOffers } from '../services/simulationService';
 import { getClubsByTier } from '../utils/clubData';
 import Negotiation from './Negotiation';
 
@@ -10,6 +10,7 @@ interface Props {
     player: Player;
     stats: SeasonStats;
     leagueTable: LeagueRow[];
+    europeTable?: LeagueRow[];
     onContinue: (updatedPlayer: Player | null) => void; // null means no change
     currentYear: number;
     onSaveExit: () => void;
@@ -17,8 +18,8 @@ interface Props {
     settings: AppSettings;
 }
 
-const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, onContinue, currentYear, onSaveExit, onViewWorld, settings }) => {
-    const [view, setView] = useState<'summary' | 'table' | 'offers'>('summary');
+const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, europeTable, onContinue, currentYear, onSaveExit, onViewWorld, settings }) => {
+    const [view, setView] = useState<'summary' | 'table' | 'europe_table' | 'offers'>('summary');
     const [activeStatTab, setActiveStatTab] = useState<'total' | 'league' | 'cup' | 'europe'>('total');
     const [offers, setOffers] = useState<Offer[]>([]);
     const [loadingOffers, setLoadingOffers] = useState(false);
@@ -27,6 +28,7 @@ const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, onContin
 
     const clubName = player.currentClub.name;
     const isOnLoan = !!player.parentClub;
+    const isInEurope = !!stats.europeCompetitionName;
     
     const getActiveStats = (): StatSet => {
         switch(activeStatTab) {
@@ -146,6 +148,9 @@ const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, onContin
         setNegotiatingOffer(null);
     };
 
+    const visibleTabs = ['total', 'league', 'cup'];
+    if (isInEurope) visibleTabs.push('europe');
+
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col">
             {negotiatingOffer && (
@@ -199,6 +204,14 @@ const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, onContin
                     >
                         League Table
                     </button>
+                    {isInEurope && (
+                        <button 
+                            onClick={() => setView('europe_table')}
+                            className={`w-full text-left p-3 rounded-xl font-bold transition ${view === 'europe_table' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                        >
+                            {stats.europeCompetitionName} Table
+                        </button>
+                    )}
                     <button 
                         onClick={() => setView('offers')}
                         className={`w-full text-left p-3 rounded-xl font-bold transition ${view === 'offers' ? 'bg-yellow-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
@@ -215,13 +228,13 @@ const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, onContin
                         <div className="p-6 overflow-y-auto">
                             <h2 className="text-xl font-bold text-white mb-4">Half-Season Stats</h2>
                             <div className="flex gap-2 mb-6 bg-slate-900/50 p-1 rounded-lg w-fit">
-                                {(['total', 'league', 'cup', 'europe'] as const).map(tab => (
+                                {visibleTabs.map(tab => (
                                     <button
                                         key={tab}
-                                        onClick={() => setActiveStatTab(tab)}
+                                        onClick={() => setActiveStatTab(tab as any)}
                                         className={`px-4 py-1 rounded-md text-xs font-bold uppercase transition ${activeStatTab === tab ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                                     >
-                                        {tab}
+                                        {tab === 'europe' && stats.europeCompetitionName ? stats.europeCompetitionName : tab}
                                     </button>
                                 ))}
                             </div>
@@ -257,19 +270,21 @@ const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, onContin
                                         <div className={`h-full ${stats.cupStatus.includes('Eliminated') ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: '60%' }}></div>
                                     </div>
                                 </div>
-                                <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-sm font-bold text-slate-400">Continental</span>
-                                        <span className={`text-xs font-bold px-2 py-1 rounded ${stats.europeStatus === 'Not Qualified' ? 'bg-slate-800 text-slate-500' : stats.europeStatus.includes('Eliminated') ? 'bg-red-900/30 text-red-400' : 'bg-blue-900/30 text-blue-400'}`}>
-                                            {stats.europeStatus}
-                                        </span>
-                                    </div>
-                                    {stats.europeStatus !== 'Not Qualified' && (
-                                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                                            <div className={`h-full ${stats.europeStatus.includes('Eliminated') ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: '50%' }}></div>
+                                {isInEurope && (
+                                    <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-sm font-bold text-slate-400">{stats.europeCompetitionName}</span>
+                                            <span className={`text-xs font-bold px-2 py-1 rounded ${stats.europeStatus === 'Not Qualified' ? 'bg-slate-800 text-slate-500' : stats.europeStatus.includes('Eliminated') ? 'bg-red-900/30 text-red-400' : 'bg-blue-900/30 text-blue-400'}`}>
+                                                {stats.europeStatus}
+                                            </span>
                                         </div>
-                                    )}
-                                </div>
+                                        {stats.europeStatus !== 'Not Qualified' && (
+                                            <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                                                <div className={`h-full ${stats.europeStatus.includes('Eliminated') ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: '50%' }}></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -294,6 +309,40 @@ const MidSeasonWindow: React.FC<Props> = ({ player, stats, leagueTable, onContin
                                                 {row.name}
                                             </td>
                                             <td className="p-4 text-center text-slate-500">{row.played}</td>
+                                            <td className="p-4 text-center font-bold text-white">{row.points}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* EUROPE TABLE VIEW */}
+                    {view === 'europe_table' && europeTable && (
+                        <div className="flex-1 overflow-y-auto">
+                            <div className="p-4 bg-slate-900 sticky top-0 z-10 border-b border-slate-700">
+                                <h3 className="text-white font-bold uppercase">{stats.europeCompetitionName} - League Phase</h3>
+                                <p className="text-xs text-slate-500">Top 8 to RO16, 9-24 to Playoffs.</p>
+                            </div>
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-900 text-slate-400 uppercase text-xs font-bold sticky top-[68px] z-10">
+                                    <tr>
+                                        <th className="p-4 text-left">Pos</th>
+                                        <th className="p-4 text-left">Club</th>
+                                        <th className="p-4 text-center">P</th>
+                                        <th className="p-4 text-center">GD</th>
+                                        <th className="p-4 text-center">Pts</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-700">
+                                    {europeTable.map((row) => (
+                                        <tr key={row.name} className={`${row.isPlayerClub ? 'bg-blue-900/20' : ''} hover:bg-slate-700/50`}>
+                                            <td className={`p-4 font-bold ${row.position <= 8 ? 'text-green-400' : row.position <= 24 ? 'text-yellow-400' : 'text-red-400'}`}>{row.position}</td>
+                                            <td className={`p-4 font-bold ${row.isPlayerClub ? 'text-white' : 'text-slate-400'}`}>
+                                                {row.name}
+                                            </td>
+                                            <td className="p-4 text-center text-slate-500">{row.played}</td>
+                                            <td className="p-4 text-center text-slate-500">{row.gd}</td>
                                             <td className="p-4 text-center font-bold text-white">{row.points}</td>
                                         </tr>
                                     ))}

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Player, Offer, OfferType, Club, Position, PromisedRole, ContractType, SeasonRecord, AppSettings } from '../types';
-import { generateTransferOffers } from '../services/geminiService';
+import { generateTransferOffers } from '../services/simulationService';
 import { getClubsByTier, FREE_AGENT_CLUB, REAL_CLUBS } from '../utils/clubData';
 import { getRandomInt, calculateStars, getPromisedRole, isSurplusToRequirements, calculateMarketValue, formatCurrency } from '../utils/gameLogic';
 import Negotiation from './Negotiation';

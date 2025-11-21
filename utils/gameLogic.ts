@@ -94,25 +94,41 @@ export const processWorldSeasonEnd = (allClubs: Club[], currentWorldTables: Worl
         
         if (!hierarchy) return;
 
-        // Identify Promoted/Relegated Teams
-        // Logic: 
-        // Tier 1: Relegate bottom 3
-        // Tier 2-4: Promote top 3, Relegate bottom 3
-        // Tier 5: Promote top 3
-        
-        const isTopTier = hierarchy.tier === 1;
-        const isBottomTier = !hierarchy.child;
+        // Sort table by pos just to be safe (re-sort to be 100% sure of order)
+        const sortedTable = [...table].sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            return a.name.localeCompare(b.name);
+        });
 
-        const promotedCount = 3;
-        const relegatedCount = 3;
-
-        // Sort table by pos just to be safe
-        const sortedTable = [...table].sort((a,b) => a.position - b.position);
-
-        // Teams moving UP (to Parent)
+        // Promotion Logic (Moving UP)
         if (hierarchy.parent) {
-            const promoters = sortedTable.slice(0, promotedCount);
-            promoters.forEach(row => {
+            // Standard Logic: Top 2 Auto, 3rd-6th Playoff
+            // We simulate the playoff to determine the 3rd promoter.
+            const autoPromoters = sortedTable.slice(0, 2);
+            
+            // Identify playoff teams (Pos 3,4,5,6)
+            // Array index 2,3,4,5
+            const playoffTeams = sortedTable.slice(2, 6);
+            
+            // Determine playoff winner (Simulate logic)
+            // 3v6, 4v5
+            // For simplicity, we pick one weighted by league position/strength roughly
+            // We don't have strength in LeagueRow easily accessible without lookup, so we use RNG favoring higher seeds.
+            let playoffWinner = playoffTeams[0]; // Default to 3rd place if array small
+            
+            if (playoffTeams.length >= 4) {
+                 // Semi 1: 3rd vs 6th (70% chance 3rd wins)
+                 const winnerS1 = Math.random() < 0.7 ? playoffTeams[0] : playoffTeams[3];
+                 // Semi 2: 4th vs 5th (60% chance 4th wins)
+                 const winnerS2 = Math.random() < 0.6 ? playoffTeams[1] : playoffTeams[2];
+                 
+                 // Final
+                 playoffWinner = Math.random() < 0.55 ? winnerS1 : winnerS2;
+            }
+
+            const allPromoters = [...autoPromoters, playoffWinner].filter(x => x !== undefined);
+
+            allPromoters.forEach(row => {
                 const clubIndex = nextClubs.findIndex(c => c.name === row.name);
                 if (clubIndex !== -1) {
                     nextClubs[clubIndex].league = hierarchy.parent!;
@@ -122,9 +138,12 @@ export const processWorldSeasonEnd = (allClubs: Club[], currentWorldTables: Worl
             });
         }
 
-        // Teams moving DOWN (to Child)
+        // Relegation Logic (Moving DOWN)
+        // Bottom 3 Relegated
         if (hierarchy.child) {
+            const relegatedCount = 3;
             const relegators = sortedTable.slice(sortedTable.length - relegatedCount);
+            
             relegators.forEach(row => {
                 const clubIndex = nextClubs.findIndex(c => c.name === row.name);
                 if (clubIndex !== -1) {
@@ -136,7 +155,7 @@ export const processWorldSeasonEnd = (allClubs: Club[], currentWorldTables: Worl
         }
 
         // Continental Qualification (Only for Tier 1)
-        if (isTopTier) {
+        if (hierarchy.tier === 1) {
             sortedTable.forEach((row, idx) => {
                 const clubIndex = nextClubs.findIndex(c => c.name === row.name);
                 if (clubIndex !== -1) {
@@ -196,7 +215,11 @@ export const generateWorldLeagues = (gamesPlayed: number, allClubs: Club[]): Wor
             };
         });
 
-        table.sort((a, b) => b.points - a.points || b.gd - a.gd);
+        // Sorting: Points DESC, then Name ASC
+        table.sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            return a.name.localeCompare(b.name);
+        });
         
         // Add status flags
         const leagueConfig = LEAGUE_HIERARCHY[leagueName];
@@ -207,10 +230,12 @@ export const generateWorldLeagues = (gamesPlayed: number, allClubs: Club[]): Wor
                     if (idx < 4) status = 'UCL';
                     else if (idx < 6) status = 'UEL';
                     else if (idx === 6) status = 'UECL';
-                    else if (idx >= table.length - 3) status = 'REL';
+                    else if (idx >= table.length - 3 && leagueConfig.child) status = 'REL';
                 } else {
                     // Lower tiers
-                    if (idx < 3 && leagueConfig.parent) status = 'PRO';
+                    // Top 2 Auto, 3-6 Playoff
+                    if (idx < 2 && leagueConfig.parent) status = 'PRO';
+                    else if (idx >= 2 && idx <= 5 && leagueConfig.parent) status = 'PRO'; // Mark playoff spots as potential PRO visual
                     else if (idx >= table.length - 3 && leagueConfig.child) status = 'REL';
                 }
             }
@@ -221,6 +246,73 @@ export const generateWorldLeagues = (gamesPlayed: number, allClubs: Club[]): Wor
     });
 
     return worldTables;
+};
+
+export const generateEuropeanLeagueTable = (
+    myClub: Club,
+    gamesPlayed: number,
+    allClubs: Club[],
+    competitionName: string
+): LeagueRow[] => {
+    // Filter clubs that should be in this competition
+    let compTier = ContinentalTier.CHAMPIONS;
+    if (competitionName.includes("Europa")) compTier = ContinentalTier.EUROPA;
+    if (competitionName.includes("Conference")) compTier = ContinentalTier.CONFERENCE;
+
+    // Get all clubs in this tier from world data
+    let participants = allClubs.filter(c => c.continentalTier === compTier);
+    
+    // Ensure myClub is included if not already (e.g. manually inserted for logic)
+    if (!participants.find(c => c.name === myClub.name)) participants.push(myClub);
+    
+    // If we don't have enough, grab randoms from other countries to fill to 36
+    if (participants.length < 36) {
+        const filler = allClubs.filter(c => c.tier === 1 && c.continentalTier === ContinentalTier.NONE && c.name !== myClub.name);
+        participants = [...participants, ...filler.slice(0, 36 - participants.length)];
+    }
+    
+    // Limit to 36
+    participants = participants.slice(0, 36);
+
+    // Simulate
+    const table: LeagueRow[] = participants.map(team => {
+        const isPlayer = team.name === myClub.name;
+        const strength = team.strength;
+        
+        // Sim performance based on strength
+        // 8 games in Swiss model usually
+        const relativeStr = strength - 70; // Base euro strength
+        let winProb = 0.4 + (relativeStr * 0.02);
+        winProb = clamp(winProb, 0.1, 0.9);
+        
+        let won = 0, drawn = 0, lost = 0;
+        for(let i=0; i<gamesPlayed; i++) {
+             const r = Math.random();
+             if (r < winProb) won++;
+             else if (r < winProb + 0.25) drawn++;
+             else lost++;
+        }
+        
+        const points = (won * 3) + drawn;
+        const gd = (won * 2) - lost;
+
+        return { 
+            position: 0, 
+            name: team.name, 
+            played: gamesPlayed, 
+            won, drawn, lost, gd, points, 
+            isPlayerClub: isPlayer,
+            status: points > 15 ? 'PRO' : undefined // Rough estimate for KO stage
+        };
+    });
+
+    // Sorting: Points DESC, then Name ASC
+    table.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        return a.name.localeCompare(b.name);
+    });
+
+    return table.map((r, i) => ({ ...r, position: i + 1 }));
 };
 
 
@@ -428,7 +520,11 @@ export const generateLeagueTable = (myClub: Club, isMidSeason: boolean, allClubs
         return { position: 0, name: team.name, played: gamesPlayed, won, drawn, lost, gd, points, isPlayerClub: isPlayer };
     });
 
-    table.sort((a, b) => b.points - a.points || b.gd - a.gd);
+    // Sorting: Points DESC, then Name ASC
+    table.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        return a.name.localeCompare(b.name);
+    });
     return table.map((row, idx) => ({ ...row, position: idx + 1 }));
 };
 
@@ -695,15 +791,21 @@ export const calculateGrowth = (
 const CUP_ROUNDS = ["Round 1", "Round 2", "Round 3", "Round 4", "Quarter Final", "Semi Final", "Final", "Winner"];
 const EUROPE_ROUNDS = ["Qualifying", "Group Stage", "Round of 16", "Quarter Final", "Semi Final", "Final", "Winner"];
 
-const simulateCompetitionProgress = (currentStatus: string, rounds: string[], teamStrength: number, isMidSeason: boolean): string => {
+const simulateCompetitionProgress = (
+    currentStatus: string, 
+    rounds: string[], 
+    teamStrength: number, 
+    isMidSeason: boolean,
+    tier: ContinentalTier = ContinentalTier.NONE
+): string => {
+    if (tier === ContinentalTier.NONE && rounds === EUROPE_ROUNDS) return "Not Qualified";
     if (currentStatus.includes("Eliminated") || currentStatus === "Winner") return currentStatus;
 
     let currentRoundIndex = rounds.indexOf(currentStatus.replace(" (Active)", ""));
     if (currentRoundIndex === -1) currentRoundIndex = 0;
 
     const midSeasonCapIndex = rounds.length - 4; 
-    const advanceProb = 0.35 + (teamStrength * 0.004); 
-
+    
     let status = currentStatus.replace(" (Active)", "");
     if ((status === "" || status === "Not Qualified") && currentRoundIndex === 0) {
         status = rounds[1];
@@ -713,6 +815,39 @@ const simulateCompetitionProgress = (currentStatus: string, rounds: string[], te
     let activeIndex = currentRoundIndex;
     while (activeIndex < rounds.length - 1) { 
         if (isMidSeason && activeIndex >= midSeasonCapIndex) return `${rounds[activeIndex]} (Active)`;
+        
+        // --- OPPONENT STRENGTH LOGIC ---
+        // Simulate the strength of opponents based on the tier and round.
+        // Deeper rounds = Stronger opponents.
+        let opponentStrength = 70; 
+        
+        // Base strength for tier
+        if (tier === ContinentalTier.CHAMPIONS) opponentStrength = 82;
+        else if (tier === ContinentalTier.EUROPA) opponentStrength = 76;
+        else if (tier === ContinentalTier.CONFERENCE) opponentStrength = 72;
+
+        // Round difficulty scaling
+        // Groups (1) -> +0
+        // RO16 (2) -> +2
+        // QF (3) -> +4
+        // SF (4) -> +8
+        // Final (5) -> +10
+        if (rounds === EUROPE_ROUNDS) {
+             if (activeIndex >= 2) opponentStrength += (activeIndex - 1) * 2.5;
+             // Extra difficulty for finals to prevent flukes
+             if (activeIndex >= 5) opponentStrength += 5; // Significant buff for SF/Finals
+        } else {
+            // Domestic Cup Scaling
+            opponentStrength += (activeIndex * 1.5);
+        }
+
+        const diff = teamStrength - opponentStrength;
+        let advanceProb = 0.5 + (diff * 0.025); 
+        
+        // Cap probability to prevent guaranteed wins for slightly better teams,
+        // but ensure very weak teams have almost 0 chance against giants.
+        advanceProb = clamp(advanceProb, 0.02, 0.98);
+
         if (Math.random() < advanceProb) {
             activeIndex++;
             status = rounds[activeIndex];
@@ -861,20 +996,29 @@ export const simulateSeasonPerformance = (
   const leagueStatsSenior = generateStatSet(leagueAppsSenior, currentAbility * perfMod, player.position, oppositionStrengthSenior);
   const leagueStatsYouth = generateStatSet(leagueAppsYouth, currentAbility * perfMod, player.position, oppositionStrengthYouth);
 
-  const cupStatus = simulateCompetitionProgress("Round 3", CUP_ROUNDS, currentClub.strength, isMidSeasonWindow);
+  const cupStatus = simulateCompetitionProgress("Round 3", CUP_ROUNDS, currentClub.strength, isMidSeasonWindow, ContinentalTier.NONE);
   const cupGames = isSeniorRegular ? getRandomInt(1, 4) : 0; 
   const cupStats = generateStatSet(cupGames, currentAbility * perfMod, player.position, oppositionStrengthSenior, true);
   
-  const europeStatus = simulateCompetitionProgress("Not Qualified", EUROPE_ROUNDS, currentClub.strength, isMidSeasonWindow);
+  const europeStatus = simulateCompetitionProgress("Not Qualified", EUROPE_ROUNDS, currentClub.strength, isMidSeasonWindow, currentClub.continentalTier);
   const europeGames = isSeniorRegular && europeStatus !== "Not Qualified" ? getRandomInt(2, 6) : 0;
   const europeStats = generateStatSet(europeGames, currentAbility * perfMod, player.position, oppositionStrengthSenior);
+  
+  let europeCompName = "";
+  if (currentClub.continentalTier === ContinentalTier.CHAMPIONS) europeCompName = "UCL";
+  else if (currentClub.continentalTier === ContinentalTier.EUROPA) europeCompName = "UEL";
+  else if (currentClub.continentalTier === ContinentalTier.CONFERENCE) europeCompName = "UECL";
 
   const intStats = { matches: 0, starts: 0, minutes: 0, goals: 0, assists: 0, cleanSheets: 0, rating: 0, motm: 0 };
   const breakdown: Record<string, StatSet> = {};
 
   if (!isMidSeasonWindow) {
       if (cupStatus === "Winner") trophies.push("Domestic Cup Winner");
-      if (europeStatus === "Winner") trophies.push(`Continental Cup Winner`);
+      if (europeStatus === "Winner") {
+           if (currentClub.continentalTier === ContinentalTier.CHAMPIONS) trophies.push("Champions League Winner");
+           else if (currentClub.continentalTier === ContinentalTier.EUROPA) trophies.push("Europa League Winner");
+           else trophies.push("Conference League Winner");
+      }
       
       if (player.config.modifiers.randomLifeEvents && Math.random() < 0.2) {
          const recoveryEvents = ["Hired private physio", "Adopted new diet", "Started yoga"];
@@ -911,6 +1055,7 @@ export const simulateSeasonPerformance = (
           weeksOut,
           cupStatus,
           europeStatus,
+          europeCompetitionName: europeCompName,
           awards: [] 
       },
       trophies,
